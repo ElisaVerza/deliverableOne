@@ -1,9 +1,9 @@
 package elisaverza;
 
 import java.io.BufferedReader;
-//import java.io.File;
+import java.io.File;
 import java.io.FileReader;
-//import java.io.FileWriter;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.URL;
@@ -11,10 +11,11 @@ import java.net.URLConnection;
 import java.util.Base64;
 
 import org.json.JSONArray;
+import org.json.JSONObject;
 
 public class DataRetrieve 
 {
-    //private static final String CSV_FILENAME = "data.csv";
+    private static final String CSV_COMMIT = "commitdata.csv";
     private static final String PRJ_NAME = "Bookkeeper";
     private static final String USERNAME = "ElisaVerza";
     private static final String AUTH_CODE = "/home/ella/vsWorkspace/auth_code.txt";
@@ -36,32 +37,66 @@ public class DataRetrieve
         return uc;
     }
 
-    public static JSONArray download_data() throws IOException{
-        JSONArray jPage = new JSONArray();
-        URL url = new URL("https://api.github.com/repos/apache/"+PRJ_NAME+"/commits?page=1&per_page=100");
-        URLConnection uc = auth(url);
-        InputStreamReader inputStreamReader = new InputStreamReader(uc.getInputStream());
+    public static String parse_id(String toParse){
+        String parsed = "";
+        Integer i = toParse.indexOf("#", 0);
+	    while(i>=0){
+	        if(Character.isDigit(toParse.charAt(i+1))){
+	            while(Character.isDigit(toParse.charAt(i+1))){
+		            parsed = parsed+toParse.charAt(i+1);
+		            i++;
+	            }
+	            return parsed;
+	        }
+	        else{
+	            i = toParse.indexOf("#", i+1);}
+	    }
+        return parsed;
+    }
 
-        try(BufferedReader rd = new BufferedReader(inputStreamReader);){
-            StringBuilder sb = new StringBuilder();
-            int cp;
-            while ((cp = rd.read()) != -1) {
-               sb.append((char) cp);
+    public static void commit_data(FileWriter commitWriter) throws IOException{
+        Integer i = 1; 
+        Integer l = 0;
+        Integer k;
+        String date;
+        String jiraId;
+        JSONArray jPage;
+        do{
+            jPage = new JSONArray();
+            URL url = new URL("https://api.github.com/repos/apache/"+PRJ_NAME+"/commits?page="+i.toString()+"&per_page=100");
+            URLConnection uc = auth(url);
+            InputStreamReader inputStreamReader = new InputStreamReader(uc.getInputStream());
+
+            try(BufferedReader rd = new BufferedReader(inputStreamReader);){
+                StringBuilder sb = new StringBuilder();
+                int cp;
+                while ((cp = rd.read()) != -1) {
+                sb.append((char) cp);
+                }
+                jPage = new JSONArray(sb.toString());
+                l = jPage.length();
+
+                for(k=0; k<l; k++){
+                    date = jPage.getJSONObject(k).getJSONObject("commit").getJSONObject("committer").getString("date");
+                    jiraId = parse_id(jPage.getJSONObject(k).getJSONObject("commit").getString("message"));
+                    commitWriter.append(date + "," + jiraId + jPage.getJSONObject(k).getJSONObject("commit").getString("message")+"\n");
+                }
+
+                
+            } finally {
+            inputStreamReader.close();
             }
-            jPage = new JSONArray(sb.toString());
-            
-        } finally {
-           inputStreamReader.close();
-        }
-        return jPage;
+            i++;
+        } while(l != 0);
     }
 
     public static void main( String[] args ) throws IOException{
-        /* TODO: Creazione colonne csv finale, funziona
-        File csvFile = new File(CSV_FILENAME);
-        FileWriter csvWriter = new FileWriter(csvFile);
-        csvWriter.append("name, class name, version, bugginess\n");
-        csvWriter.close();*/
-        System.out.println(download_data().toString());
+
+        File commitFile = new File(CSV_COMMIT);
+        FileWriter commitWriter = new FileWriter(commitFile);
+        commitWriter.append("date, jira_id\n");
+        commit_data(commitWriter);
+        commitWriter.close();
+
     }
 }
