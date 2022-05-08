@@ -61,6 +61,7 @@ public class DataRetrieve
         String date;
         String jiraId;
         JSONArray jPage;
+        String temp;
         do{
             jPage = new JSONArray();
             URL url = new URL("https://api.github.com/repos/apache/"+PRJ_NAME+"/commits?page="+i.toString()+"&per_page=100");
@@ -77,9 +78,16 @@ public class DataRetrieve
                 l = jPage.length();
 
                 for(k=0; k<l; k++){
+                    temp = jPage.getJSONObject(k).getJSONObject("commit").getString("message");
                     date = jPage.getJSONObject(k).getJSONObject("commit").getJSONObject("committer").getString("date");
                     jiraId = parse_id(jPage.getJSONObject(k).getJSONObject("commit").getString("message"));
-                    commitWriter.append(date + "," + jiraId + jPage.getJSONObject(k).getJSONObject("commit").getString("message")+"\n");
+                    temp = temp.replaceAll(",", " ");
+                    temp = temp.replaceAll("\n", " ");
+                    temp = temp.replaceAll("\r", " ");
+                    temp = temp.replaceAll("\t", " ");
+                    commitWriter.append(date + "," + jiraId +",");
+                    commitWriter.append(temp);
+                    commitWriter.append("\n");
                 }
 
                 
@@ -94,7 +102,7 @@ public class DataRetrieve
 
         File commitFile = new File(CSV_COMMIT);
         FileWriter commitWriter = new FileWriter(commitFile);
-        commitWriter.append("date, jira_id\n");
+        commitWriter.append("date,jira_id,comment\n");
         commit_data(commitWriter);
         commitWriter.close();
 
