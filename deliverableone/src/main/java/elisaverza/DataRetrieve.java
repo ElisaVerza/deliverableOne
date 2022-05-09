@@ -9,9 +9,12 @@ import java.io.InputStreamReader;
 import java.net.URL;
 import java.net.URLConnection;
 import java.util.Base64;
+import java.util.logging.FileHandler;
+import java.util.logging.Logger;
+
 
 import org.json.JSONArray;
-import org.json.JSONObject;
+//import org.json.JSONObject;
 
 public class DataRetrieve 
 {
@@ -37,9 +40,23 @@ public class DataRetrieve
         return uc;
     }
 
-    public static String parse_id(String toParse){
+    public static String parse_id(String toParse) throws SecurityException, IOException{
         String parsed = "";
         Integer i = toParse.indexOf("#", 0);
+        Integer j = toParse.indexOf("BOOKKEEPER-")+11;
+
+        if(toParse.contains("BOOKKEEPER-")){
+            while(toParse.length()>j){
+                if(Character.isDigit(toParse.charAt(j))){
+                    System.out.println("Lunghezza toParse"+toParse.length()+"\nIndice"+j);
+                    parsed = parsed+toParse.charAt(j);
+                    j++;
+                }
+                else{ break;}
+            }
+        }
+        if(parsed.length()>0){return parsed;}
+
 	    while(i>=0){
 	        if(Character.isDigit(toParse.charAt(i+1))){
 	            while(Character.isDigit(toParse.charAt(i+1))){
