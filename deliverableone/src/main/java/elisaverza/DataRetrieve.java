@@ -5,16 +5,19 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.PrintStream;
+import java.io.Reader;
 import java.net.URL;
 import java.net.URLConnection;
+import java.nio.charset.Charset;
 import java.util.Base64;
-import java.util.logging.FileHandler;
-import java.util.logging.Logger;
 
 
 import org.json.JSONArray;
-//import org.json.JSONObject;
+import org.json.JSONException;
+import org.json.JSONObject;
 
 public class DataRetrieve 
 {
@@ -40,6 +43,41 @@ public class DataRetrieve
         return uc;
     }
 
+    private static String read_all(BufferedReader rd) throws IOException {
+        StringBuilder sb = new StringBuilder();
+        int cp;
+        while ((cp = rd.read()) != -1) {
+           sb.append((char) cp);
+        }
+        return sb.toString();
+     }
+
+     public static JSONArray read_json_array_from_url(String url) throws IOException, JSONException {
+        InputStream is = new URL(url).openStream();
+        try {
+           BufferedReader rd = new BufferedReader(new InputStreamReader(is,"utf-8"),8);
+           String jsonText = read_all(rd);
+
+           JSONArray json = new JSONArray(jsonText);
+           return json;
+         } finally {
+           is.close();
+         }
+     }
+  
+     public static JSONObject read_json_obj_from_url(String url) throws IOException, JSONException {
+        InputStream is = new URL(url).openStream();
+        try {
+           BufferedReader rd = new BufferedReader(new InputStreamReader(is,"utf-8"),8);
+           String jsonText = read_all(rd);
+
+           JSONObject json = new JSONObject(jsonText);
+           return json;
+         } finally {
+           is.close();
+         }
+     }
+
     public static String parse_id(String toParse) throws SecurityException, IOException{
         String parsed = "";
         Integer i = toParse.indexOf("#", 0);
@@ -48,7 +86,6 @@ public class DataRetrieve
         if(toParse.contains("BOOKKEEPER-")){
             while(toParse.length()>j){
                 if(Character.isDigit(toParse.charAt(j))){
-                    System.out.println("Lunghezza toParse"+toParse.length()+"\nIndice"+j);
                     parsed = parsed+toParse.charAt(j);
                     j++;
                 }
@@ -71,6 +108,29 @@ public class DataRetrieve
         return parsed;
     }
 
+    public static void jira_data() throws JSONException, IOException{
+        Integer j = 0, i = 0, total = 1;
+      //Get JSON API for closed bugs w/ AV in the project
+      do {
+         //Only gets a max of 1000 at a time, so must do this multiple times if bugs >1000
+         j = i + 1000;
+         JSONArray json = new JSONArray();
+         String url = "https://issues.apache.org/jira/rest/api/2/search?jql=project=%22"
+                + PRJ_NAME + "%22AND%22issueType%22=%22Bug%22AND(%22status%22=%22closed%22OR"
+                + "%22status%22=%22resolved%22)AND%22resolution%22=%22fixed%22&fields=key,resolutiondate,versions,created&startAt="
+                + i.toString() + "&maxResults=" + j.toString();
+         JSONObject jsonObj = read_json_obj_from_url(url);
+         json = new JSONArray(jsonObj.getJSONArray("issues"));
+         total = jsonObj.getInt("total");
+         for (; i < total && i < j; i++) {
+            //Iterate through each bug
+            String key = json.getJSONObject(i%1000).get("key").toString();
+            System.out.println(key);
+         }  
+      } while (i < total);
+    }
+
+
     public static void commit_data(FileWriter commitWriter) throws IOException{
         Integer i = 1; 
         Integer l = 0;
@@ -81,17 +141,8 @@ public class DataRetrieve
         String temp;
         do{
             jPage = new JSONArray();
-            URL url = new URL("https://api.github.com/repos/apache/"+PRJ_NAME+"/commits?page="+i.toString()+"&per_page=100");
-            URLConnection uc = auth(url);
-            InputStreamReader inputStreamReader = new InputStreamReader(uc.getInputStream());
-
-            try(BufferedReader rd = new BufferedReader(inputStreamReader);){
-                StringBuilder sb = new StringBuilder();
-                int cp;
-                while ((cp = rd.read()) != -1) {
-                sb.append((char) cp);
-                }
-                jPage = new JSONArray(sb.toString());
+            String url = "https://api.github.com/repos/apache/"+PRJ_NAME+"/commits?page="+i.toString()+"&per_page=100";
+                jPage = new JSONArray(read_json_array_from_url(url));
                 l = jPage.length();
 
                 for(k=0; k<l; k++){
@@ -108,20 +159,18 @@ public class DataRetrieve
                 }
 
                 
-            } finally {
-            inputStreamReader.close();
-            }
             i++;
         } while(l != 0);
     }
 
     public static void main( String[] args ) throws IOException{
 
-        File commitFile = new File(CSV_COMMIT);
+        /*File commitFile = new File(CSV_COMMIT);
         FileWriter commitWriter = new FileWriter(commitFile);
         commitWriter.append("date,jira_id,comment\n");
         commit_data(commitWriter);
-        commitWriter.close();
+        commitWriter.close();*/
+        jira_data();
 
     }
 }
