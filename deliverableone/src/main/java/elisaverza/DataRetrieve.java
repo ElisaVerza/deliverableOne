@@ -113,7 +113,7 @@ public class DataRetrieve
         if(toParse.contains(PRJ_NAME)){
             j = toParse.indexOf(PRJ_NAME);
             i = j+8;
-            while(toParse.length()>j && j<i){
+            while(toParse.length()>j && j<=i){
                 if(toParse.length()>j+8 && Character.isDigit(toParse.charAt(j+8))){
                     i = j+8;
                 }
@@ -144,7 +144,6 @@ public class DataRetrieve
         String line;
         while ( (line = br.readLine()) != null ) {
             String[] values = line.split(",");
-            System.out.println(line);
             if(values[searchColumnIndex].equals(searchString)) {
                 resultRow = line;
                 break;
@@ -181,9 +180,10 @@ public class DataRetrieve
                 String resDate = json.getJSONObject(i%1000).getJSONObject("fields").get("resolutiondate").toString();
                 String created = json.getJSONObject(i%1000).getJSONObject("fields").get("created").toString();
                 String commit = searchCsvLine(1, key);
-                System.out.println(commit);
-                commit = commit.replaceAll("\n", " ");
-                commitWriter.append(commit+","+key+","+resDate+","+Arrays.toString(version)+","+created+"\n");
+                if(commit != null){
+                    commit = commit.replaceAll("\n", " ");
+                    commitWriter.append(commit+","+key+","+resDate+","+Arrays.toString(version)+","+created+"\n");
+                }
             }  
       } while (i < total);
     }
@@ -224,11 +224,11 @@ public class DataRetrieve
 
     public static void main( String[] args ) throws IOException, InterruptedException{
 
-        /*File commitFile = new File(CSV_COMMIT);
+        File commitFile = new File(CSV_COMMIT);
         FileWriter commitWriter = new FileWriter(commitFile);
         commitWriter.append("date,jira_id,comment\n");
         commit_data(commitWriter);
-        commitWriter.close();*/
+        commitWriter.close();
 
         File jiraFile = new File(CSV_JIRA);
         FileWriter jiraWriter = new FileWriter(jiraFile);
