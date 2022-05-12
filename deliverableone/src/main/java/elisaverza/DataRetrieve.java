@@ -9,6 +9,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.URL;
 import java.net.URLConnection;
+import java.util.Arrays;
 import java.util.Base64;
 
 
@@ -112,8 +113,8 @@ public class DataRetrieve
         if(toParse.contains(PRJ_NAME)){
             j = toParse.indexOf(PRJ_NAME);
             i = j+8;
-            while(toParse.length()>j && j<=i){
-                if(Character.isDigit(toParse.charAt(j+8))){
+            while(toParse.length()>j && j<i){
+                if(toParse.length()>j+8 && Character.isDigit(toParse.charAt(j+8))){
                     i = j+8;
                 }
                 parsed = parsed+toParse.charAt(j);
@@ -137,26 +138,53 @@ public class DataRetrieve
         return parsed;*/
     }
 
+    public static String searchCsvLine(int searchColumnIndex, String searchString) throws IOException {
+        String resultRow = null;
+        BufferedReader br = new BufferedReader(new FileReader(CSV_COMMIT));
+        String line;
+        while ( (line = br.readLine()) != null ) {
+            String[] values = line.split(",");
+            System.out.println(line);
+            if(values[searchColumnIndex].equals(searchString)) {
+                resultRow = line;
+                break;
+            }
+        }
+        br.close();
+
+        return resultRow;
+    }
+
     public static void jira_data(FileWriter commitWriter) throws JSONException, IOException{
         Integer j = 0, i = 0, total = 1;
-      //Get JSON API for closed bugs w/ AV in the project
-      do {
-         //Only gets a max of 1000 at a time, so must do this multiple times if bugs >1000
-         j = i + 1000;
-         JSONArray json = new JSONArray();
-         String url = "https://issues.apache.org/jira/rest/api/2/search?jql=project=%22"
-                + PRJ_NAME + "%22AND%22issueType%22=%22Bug%22AND(%22status%22=%22closed%22OR"
-                + "%22status%22=%22resolved%22)AND%22resolution%22=%22fixed%22&fields=key,resolutiondate,versions,created&startAt="
-                + i.toString() + "&maxResults=" + j.toString();
-         JSONObject jsonObj = read_json_obj_from_url(url, false);
-         json = new JSONArray(jsonObj.getJSONArray("issues"));
-         total = jsonObj.getInt("total");
-         for (; i < total && i < j; i++) {
-            //Iterate through each bug
-            String key = json.getJSONObject(i%1000).get("key").toString();
-            System.out.println(key);
-            commitWriter.append(key+"\n");
-         }  
+        do {
+            j = i + 1000;
+            JSONArray json = new JSONArray();
+            String url = "https://issues.apache.org/jira/rest/api/2/search?jql=project=%22"
+                    + PRJ_NAME + "%22AND%22issueType%22=%22Bug%22AND(%22status%22=%22closed%22OR"
+                    + "%22status%22=%22resolved%22)AND%22resolution%22=%22fixed%22&fields=key,resolutiondate,versions,created&startAt="
+                    + i.toString() + "&maxResults=" + j.toString();
+            JSONObject jsonObj = read_json_obj_from_url(url, false);
+            json = new JSONArray(jsonObj.getJSONArray("issues"));
+            total = jsonObj.getInt("total");
+
+            for (; i < total && i < j; i++) {
+                JSONArray versionArray = json.getJSONObject(i%1000).getJSONObject("fields").getJSONArray("versions");
+                String[] version = new String[versionArray.length()];
+                Integer k = 0;
+                while(versionArray.length()!=0 && k<versionArray.length()){    
+                    version[k] = versionArray.getJSONObject(k).getString("name").toString();
+                    k++;
+                }
+
+                String key = json.getJSONObject(i%1000).get("key").toString();
+                String resDate = json.getJSONObject(i%1000).getJSONObject("fields").get("resolutiondate").toString();
+                String created = json.getJSONObject(i%1000).getJSONObject("fields").get("created").toString();
+                String commit = searchCsvLine(1, key);
+                System.out.println(commit);
+                commit = commit.replaceAll("\n", " ");
+                commitWriter.append(commit+","+key+","+resDate+","+Arrays.toString(version)+","+created+"\n");
+            }  
       } while (i < total);
     }
 
@@ -196,16 +224,16 @@ public class DataRetrieve
 
     public static void main( String[] args ) throws IOException, InterruptedException{
 
-        File commitFile = new File(CSV_COMMIT);
+        /*File commitFile = new File(CSV_COMMIT);
         FileWriter commitWriter = new FileWriter(commitFile);
         commitWriter.append("date,jira_id,comment\n");
         commit_data(commitWriter);
-        commitWriter.close();
+        commitWriter.close();*/
 
         File jiraFile = new File(CSV_JIRA);
         FileWriter jiraWriter = new FileWriter(jiraFile);
         jira_data(jiraWriter);
-        commitWriter.close();
+        jiraWriter.close();
 
     }
 }
