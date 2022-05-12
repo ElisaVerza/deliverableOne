@@ -18,7 +18,8 @@ import org.json.JSONObject;
 
 public class DataRetrieve 
 {
-    private static final String CSV_COMMIT = "jiradata.csv";
+    private static final String CSV_COMMIT = "commitdata.csv";
+    private static final String CSV_JIRA = "jiradata.csv";
     private static final String PRJ_NAME = "SYNCOPE";
     private static final String USERNAME = "ElisaVerza";
     private static final String AUTH_CODE = "/home/ella/vsWorkspace/auth_code.txt";
@@ -93,10 +94,11 @@ public class DataRetrieve
 
     public static String parse_id(String toParse) throws SecurityException, IOException{
         String parsed = "";
-        Integer i = toParse.indexOf("#", 0);
-        Integer j;
+        //Integer i = toParse.indexOf("#", 0);
+        Integer j = 0;
+        Integer i = 0;
 
-        if(toParse.contains("BOOKKEEPER-")){
+        /*if(toParse.contains("BOOKKEEPER-")){
             j = toParse.indexOf("BOOKKEEPER-");
             while(toParse.length()>j){
                 if(Character.isDigit(toParse.charAt(j))){
@@ -105,20 +107,22 @@ public class DataRetrieve
                 }
                 else{ break;}
             }
-        }
-        if(toParse.contains("SYNCOPE-")){
-            j = toParse.indexOf("SYNCOPE-");
-            while(toParse.length()>j){
-                if(Character.isDigit(toParse.charAt(j))){
-                    parsed = parsed+toParse.charAt(j);
-                    j++;
+        }*/
+
+        if(toParse.contains(PRJ_NAME)){
+            j = toParse.indexOf(PRJ_NAME);
+            i = j+8;
+            while(toParse.length()>j && j<=i){
+                if(Character.isDigit(toParse.charAt(j+8))){
+                    i = j+8;
                 }
-                else{ break;}
+                parsed = parsed+toParse.charAt(j);
+                j++;
             }
         }
-        if(parsed.length()>0){return parsed;}
+        return parsed;
 
-	    while(i>=0 && toParse.length()>i+1){
+	    /*while(i>=0 && toParse.length()>i+1){
 	        if(Character.isDigit(toParse.charAt(i+1))){
                 System.out.println(toParse.length()+" "+i);
 	            while(toParse.length()>i+1 && Character.isDigit(toParse.charAt(i+1))){
@@ -130,7 +134,7 @@ public class DataRetrieve
 	        else{
 	            i = toParse.indexOf("#", i+1);}
 	    }
-        return parsed;
+        return parsed;*/
     }
 
     public static void jira_data(FileWriter commitWriter) throws JSONException, IOException{
@@ -192,14 +196,15 @@ public class DataRetrieve
 
     public static void main( String[] args ) throws IOException, InterruptedException{
 
-        /*File commitFile = new File(CSV_COMMIT);
+        File commitFile = new File(CSV_COMMIT);
         FileWriter commitWriter = new FileWriter(commitFile);
         commitWriter.append("date,jira_id,comment\n");
         commit_data(commitWriter);
-        commitWriter.close();*/
-        File commitFile = new File(CSV_COMMIT);
-        FileWriter commitWriter = new FileWriter(commitFile);
-        jira_data(commitWriter);
+        commitWriter.close();
+
+        File jiraFile = new File(CSV_JIRA);
+        FileWriter jiraWriter = new FileWriter(jiraFile);
+        jira_data(jiraWriter);
         commitWriter.close();
 
     }
