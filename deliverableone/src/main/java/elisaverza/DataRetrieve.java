@@ -23,7 +23,7 @@ public class DataRetrieve
     private static final String CSV_JIRA = "jiradata.csv";
     private static final String PRJ_NAME = "SYNCOPE";
     private static final String USERNAME = "ElisaVerza";
-    private static final boolean DOWNLOAD_COMMIT = true;
+    private static final boolean DOWNLOAD_COMMIT = false;
     private static final String AUTH_CODE = "/home/ella/vsWorkspace/auth_code.txt";
 
     public static InputStreamReader auth(URL url) throws IOException{
@@ -109,13 +109,18 @@ public class DataRetrieve
     }
 
     public static String[] searchCsvLine(int searchColumnIndex, String searchString) throws IOException {
-        String[] resultRow = new String[10];
+        String[] resultRow = new String[0];
         Integer i = 0;
         try(BufferedReader br = new BufferedReader(new FileReader(CSV_COMMIT))){
             String line;
             while ( (line = br.readLine()) != null ) {
                 String[] values = line.split(",");
-                if(values.length > 1 && values[searchColumnIndex].equals(searchString)) {
+
+                if(values.length > 2 && values[searchColumnIndex].equals(searchString)) {
+                    String[] newArray = new String[resultRow.length + 1];
+                    System.arraycopy(resultRow, 0, newArray, 0, resultRow.length);
+
+                    resultRow = newArray;
                     resultRow[i] = line;
                     i++;
                 }
@@ -142,16 +147,16 @@ public class DataRetrieve
             fixVersion[k] = fixVersionArray.getJSONObject(k).getString("name");
             k++;
         }
-
         String key = json.getJSONObject(i%1000).get("key").toString();
         String resDate = json.getJSONObject(i%1000).getJSONObject(jsonKey).get("resolutiondate").toString();
         String created = json.getJSONObject(i%1000).getJSONObject(jsonKey).get("created").toString();
-        String[] commit = searchCsvLine(1, key);
+        String[] commit = searchCsvLine(2, key);
         String versionStr = Arrays.toString(version);
         versionStr = versionStr.replace(",", " ");
         String fixVersionStr = Arrays.toString(fixVersion);
         fixVersionStr = fixVersionStr.replace(",", " ");
         for(k=0;k<commit.length;k++){
+
             if(commit[k] != null){
                 commit[k] = commit[k].replace("\n", " ");
                 commitWriter.append(commit[k]+","+resDate+","+versionStr+","+fixVersionStr+","+created+"\n");
@@ -203,7 +208,7 @@ public class DataRetrieve
         } while(l != 0);
     }
 
-    public static void main( String[] args ) throws IOException, InterruptedException{
+    public static void fileHandler() throws IOException, InterruptedException{
 
         if(DOWNLOAD_COMMIT){
             File commitFile = new File(CSV_COMMIT);
@@ -217,5 +222,9 @@ public class DataRetrieve
             jiraWriter.append("jira_id,affected versions,fixed version,commit date,created,resolution date\n");
             jiraData(jiraWriter);    
         }
+    }
+
+    public static void main(String[] args) throws IOException, InterruptedException{
+        fileHandler();
     }
 }
