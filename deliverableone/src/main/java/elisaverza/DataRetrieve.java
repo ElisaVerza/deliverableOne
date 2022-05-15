@@ -108,15 +108,15 @@ public class DataRetrieve
         return parsed.toString();
     }
 
-    public static String[] searchCsvLine(int searchColumnIndex, String searchString) throws IOException {
+    public static String[] searchCsvLine(int searchColumnIndex, String searchString, String file) throws IOException {
         String[] resultRow = new String[0];
         Integer i = 0;
-        try(BufferedReader br = new BufferedReader(new FileReader(CSV_COMMIT))){
+        try(BufferedReader br = new BufferedReader(new FileReader(file))){
             String line;
             while ( (line = br.readLine()) != null ) {
                 String[] values = line.split(",");
 
-                if(values.length > 2 && values[searchColumnIndex].equals(searchString)) {
+                if(values.length > searchColumnIndex && values[searchColumnIndex].equals(searchString)) {
                     String[] newArray = new String[resultRow.length + 1];
                     System.arraycopy(resultRow, 0, newArray, 0, resultRow.length);
 
@@ -150,7 +150,7 @@ public class DataRetrieve
         String key = json.getJSONObject(i%1000).get("key").toString();
         String resDate = json.getJSONObject(i%1000).getJSONObject(jsonKey).get("resolutiondate").toString();
         String created = json.getJSONObject(i%1000).getJSONObject(jsonKey).get("created").toString();
-        String[] commit = searchCsvLine(2, key);
+        String[] commit = searchCsvLine(2, key, CSV_COMMIT);
         String versionStr = Arrays.toString(version);
         versionStr = versionStr.replace(",", " ");
         String fixVersionStr = Arrays.toString(fixVersion);
