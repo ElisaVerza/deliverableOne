@@ -20,7 +20,7 @@ import org.json.JSONObject;
 public class DataRetrieve 
 {
     private static final String CSV_COMMIT = "commitdata.csv";
-    private static final String CSV_JIRA = "jiradata.csv";
+    private static final String CSV_JIRA = "ticketdata.csv";
     private static final String PRJ_NAME = "SYNCOPE";
     private static final String USERNAME = "ElisaVerza";
     private static final boolean DOWNLOAD_COMMIT = false;
@@ -155,8 +155,6 @@ public class DataRetrieve
             k++;
         }
         String key = json.getJSONObject(i%1000).get("key").toString();
-        String resDate = json.getJSONObject(i%1000).getJSONObject(jsonKey).get("resolutiondate").toString();
-        String created = json.getJSONObject(i%1000).getJSONObject(jsonKey).get("created").toString();
         String[] commit = searchCsvLine(2, key, CSV_COMMIT);
         String versionStr = Arrays.toString(version);
         versionStr = versionStr.replace(",", " ");
@@ -166,7 +164,7 @@ public class DataRetrieve
 
             if(commit[k] != null){
                 commit[k] = commit[k].replace("\n", " ");
-                commitWriter.append(commit[k]+","+resDate+","+versionStr+","+fixVersionStr+","+created+"\n");
+                commitWriter.append(commit[k]+","+versionStr+","+fixVersionStr+"\n");
             }
         }
     }
@@ -220,22 +218,20 @@ public class DataRetrieve
         if(DOWNLOAD_COMMIT){
             File commitFile = new File(CSV_COMMIT);
             try(FileWriter commitWriter = new FileWriter(commitFile)){
-                commitWriter.append("date,jira_id,comment\n");
+                commitWriter.append("commit date,commit sha,jira_id\n");
                 commitData(commitWriter);
             }
         }
         if(DOWNLOAD_JIRA){
         File jiraFile = new File(CSV_JIRA);
             try(FileWriter jiraWriter = new FileWriter(jiraFile)){
-                jiraWriter.append("jira_id,affected versions,fixed version,commit date,created,resolution date\n");
+                jiraWriter.append("commit date git,commit sha,jira_id,affected versions,fixed version\n");
                 jiraData(jiraWriter);    
             }
         }
     }
 
     public static void main(String[] args) throws IOException, InterruptedException{
-        JSONObject rateLimit = readJsonObjFromUrl("https://api.github.com/rate_limit", true);
-        System.out.println(rateLimit);
         fileHandler();
     }
 }
