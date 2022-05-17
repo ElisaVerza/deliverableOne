@@ -3,6 +3,7 @@ package elisaverza;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
@@ -17,23 +18,44 @@ import org.json.JSONObject;
 public class CsvCreator {
     public static final String PRJ_NAME = "SYNCOPE";
     private static final String CSV_COMMIT = "commitdata.csv";
+    private static final String CSV_METHRICS = "data.csv";
 
-    public static void projectVersions() throws JSONException, IOException, ParseException{
+    public static void projectVersions() throws JSONException, IOException, ParseException, InterruptedException{
         String url = "https://issues.apache.org/jira/rest/api/2/project/"+PRJ_NAME+"/";
         Integer i;
+        Integer k;
         Integer len;
-        JSONObject jsonObj = DataRetrieve.readJsonObjFromUrl(url, false);
+        JSONObject jsonObj = DataRetrieve.readJsonObjFromUrl(url, true);
         JSONArray json = new JSONArray(jsonObj.getJSONArray("versions"));
         len = json.length();
         String[] versions = new String[len];
         String[] dateStr = new String[len];
-        for(i = 0; i<len; i++){
-            if(json.getJSONObject(i).getBoolean("released")){
-                versions[i] = json.getJSONObject(i).getString("name");
-                dateStr[i] = json.getJSONObject(i).getString("releaseDate");
-                dateSearch(dateStr[i]);
+        String[] commitSha = new String[len];
+        try(FileWriter csvWriter = new FileWriter(CSV_METHRICS)){
+            for(i = 0; i<len; i++){
+                if(json.getJSONObject(i).getBoolean("released")){
+                    versions[i] = json.getJSONObject(i).getString("name");
+                    dateStr[i] = json.getJSONObject(i).getString("releaseDate");
+                    commitSha[i] = dateSearch(dateStr[i]);
+                    String filesUrl = "https://api.github.com/repos/apache/"+PRJ_NAME+"/git/trees/"+commitSha[i]+"?recursive=1";
+                    JSONObject filesJsonObj = DataRetrieve.readJsonObjFromUrl(filesUrl, true);
+                    JSONArray jsonFiles = new JSONArray(filesJsonObj.getJSONArray("tree"));
+
+                    for(k = 0; k<jsonFiles.length(); k++){
+                        if(jsonFiles.getJSONObject(k).getString("path").contains(".java")){
+                            csvWriter.append(versions[i]+","+jsonFiles.getJSONObject(k).getString("path")+"\n");
+                        }
+                    }
+
+                }
+                Thread.sleep(1000);
             }
         }
+
+    }
+
+    public static void bugginess(){
+        
     }
 
     public static String dateSearch(String dateStr) throws ParseException, IOException{

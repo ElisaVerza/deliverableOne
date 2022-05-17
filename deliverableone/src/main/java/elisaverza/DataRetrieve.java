@@ -24,6 +24,7 @@ public class DataRetrieve
     private static final String PRJ_NAME = "SYNCOPE";
     private static final String USERNAME = "ElisaVerza";
     private static final boolean DOWNLOAD_COMMIT = false;
+    private static final boolean DOWNLOAD_JIRA = false;
     private static final String AUTH_CODE = "/home/ella/vsWorkspace/auth_code.txt";
 
     public static InputStreamReader auth(URL url) throws IOException{
@@ -70,7 +71,13 @@ public class DataRetrieve
            is.close();
          }
      }
-  
+
+     /*Metodo per eseguire una get dall'url specificato dal parametro. Se la richiesta è inidirizzata
+     * a github viene chiamato il metodo auth che provvederà all'autenticazione della richiesta per 
+     * evitare la limitazione delle richieste.
+     * @param url URL da cui effetturare la get
+     * @param git booleano per riconoscere se la get è indirizzata a github o no
+     */
      public static JSONObject readJsonObjFromUrl(String url, boolean git) throws IOException, JSONException {
         InputStreamReader is;
         if(git){
@@ -217,14 +224,18 @@ public class DataRetrieve
                 commitData(commitWriter);
             }
         }
+        if(DOWNLOAD_JIRA){
         File jiraFile = new File(CSV_JIRA);
-        try(FileWriter jiraWriter = new FileWriter(jiraFile)){
-            jiraWriter.append("jira_id,affected versions,fixed version,commit date,created,resolution date\n");
-            jiraData(jiraWriter);    
+            try(FileWriter jiraWriter = new FileWriter(jiraFile)){
+                jiraWriter.append("jira_id,affected versions,fixed version,commit date,created,resolution date\n");
+                jiraData(jiraWriter);    
+            }
         }
     }
 
     public static void main(String[] args) throws IOException, InterruptedException{
+        JSONObject rateLimit = readJsonObjFromUrl("https://api.github.com/rate_limit", true);
+        System.out.println(rateLimit);
         fileHandler();
     }
 }
