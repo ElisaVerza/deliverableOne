@@ -25,7 +25,7 @@ public class CsvCreator {
     public static final String PRJ_NAME = "SYNCOPE";
     private static final String CSV_COMMIT = "commitdata.csv";
     private static final String CSV_METHRICS = "data.csv";
-    private static final boolean DOWNLOAD_FILES = false;
+    private static final boolean DOWNLOAD_FILES = true;
 
 
     public static String[] projectVersions() throws JSONException, IOException, ParseException, InterruptedException{
@@ -36,10 +36,11 @@ public class CsvCreator {
         JSONObject jsonObj = DataRetrieve.readJsonObjFromUrl(url, false);
         JSONArray json = new JSONArray(jsonObj.getJSONArray("versions"));
         len = json.length();
-        String[] versions = new String[len];
-        String[] dateStr = new String[len];
-        String[] commitSha = new String[len];
-        try(FileWriter csvWriter = new FileWriter(CSV_METHRICS)){
+        String[] versions = new String[len/2+1];
+        String[] dateStr = new String[len/2+1];
+        String[] commitSha = new String[len/2+1];
+
+        try(FileWriter csvWriter = new FileWriter(CSV_METHRICS, DOWNLOAD_FILES)){
             for(i = 0; i<len; i++){
                 System.out.println(i);
                 if(json.getJSONObject(i).getBoolean("released")){
@@ -53,7 +54,7 @@ public class CsvCreator {
 
                         for(k = 0; k<jsonFiles.length(); k++){
                             if(jsonFiles.getJSONObject(k).getString("path").contains(".java")){
-                                csvWriter.append(versions[i]+","+jsonFiles.getJSONObject(k).getString("path")+"\n");
+                                csvWriter.append(versions[i]+","+jsonFiles.getJSONObject(k).getString("path")+","+"No\n");
                             }
                         }
                     }
@@ -67,18 +68,29 @@ public class CsvCreator {
         return versions;
     }
 
-    public static void bugginess() throws IOException, JSONException, ParseException, InterruptedException{
+    public static void bugginess() throws IOException, JSONException, ParseException, InterruptedException, CsvException{
         Integer i;
+        Integer k;
         String[] versions = projectVersions();
         for(i = 0; i<versions.length; i++){
+            Integer j = 0;
             try(BufferedReader br = new BufferedReader(new FileReader("ticketdata.csv"))){
-                String line;
+                String line = br.readLine();
                 while ( (line = br.readLine()) != null ) {
                     String[] values = line.split(",");
-                    if(values.length > 3 && values[3]!=null && values[3].contains(versions[i])) {
+                    if(values.length > 3 && versions[i]!=null) {
                         String sha = values[1];
-                        System.out.println(sha+" "+values[3]+" "+versions[i]);
+                        String classesUrl = "https://api.github.com/repos/apache/"+PRJ_NAME+"/commits/"+sha;
+                        JSONObject classesJsonObj = DataRetrieve.readJsonObjFromUrl(classesUrl, true);
+                        JSONArray jsonClasses = new JSONArray(classesJsonObj.getJSONArray("files"));
+                        for(k=0; k<jsonClasses.length();k++){
+                            System.out.println(versions[i]+" "+k);
+                            if(jsonClasses.getJSONObject(k).getString("filename").contains(".java")){
+                                updateDataCSV(CSV_METHRICS, "Yes", j, 2);
+                            }
+                        }
                     }
+                    j++;
                 }
             }
         }
@@ -133,7 +145,7 @@ public class CsvCreator {
     }
 
 
-    public static void main(String[] args) throws IOException, InterruptedException, JSONException, ParseException{
+    public static void main(String[] args) throws IOException, InterruptedException, JSONException, ParseException, CsvException{
         DataRetrieve.fileHandler();
         bugginess();
     }
