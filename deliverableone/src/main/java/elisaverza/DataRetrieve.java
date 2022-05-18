@@ -53,6 +53,16 @@ public class DataRetrieve
         return sb.toString();
      }
 
+     /**
+     * Metodo per eseguire una get dall'url specificato dal parametro omonimo da cui 
+     * si otterrà un JsonArray. Se la richiesta è inidirizzata a github viene chiamato 
+     * il metodo auth che provvederà all'autenticazione della richiesta per evitare la 
+     * limitazione delle richieste.
+     * 
+     * @param url URL da cui effetturare la get
+     * @param git booleano per riconoscere se la get è indirizzata a github o no
+     * @return jsonText JsonArray ottenuto con la chiamata get
+     */
      public static JSONArray readJsonArrayFromUrl(String url, boolean git) throws IOException, JSONException {
         InputStreamReader is;
         if(git){
@@ -72,13 +82,17 @@ public class DataRetrieve
          }
      }
 
-     /*Metodo per eseguire una get dall'url specificato dal parametro. Se la richiesta è inidirizzata
-     * a github viene chiamato il metodo auth che provvederà all'autenticazione della richiesta per 
-     * evitare la limitazione delle richieste.
+     /**
+     * Metodo per eseguire una get dall'url specificato dal parametro omonimo da cui 
+     * si otterrà un JsonObject. Se la richiesta è inidirizzata a github viene chiamato 
+     * il metodo auth che provvederà all'autenticazione della richiesta per evitare la 
+     * limitazione delle richieste.
+     * 
      * @param url URL da cui effetturare la get
      * @param git booleano per riconoscere se la get è indirizzata a github o no
+     * @return jsonText JsonObject ottenuto con la chiamata get
      */
-     public static JSONObject readJsonObjFromUrl(String url, boolean git) throws IOException, JSONException {
+    public static JSONObject readJsonObjFromUrl(String url, boolean git) throws IOException, JSONException {
         InputStreamReader is;
         if(git){
             URL strToUrl = new URL(url);
@@ -96,6 +110,12 @@ public class DataRetrieve
          }
      }
 
+     /**
+      * Metodo per cercare il jira id nei commenti dei commit.
+      *
+      * @param toParse stringa del messaggio di commit in cui cercare il jira id
+      * @return parseId stringa contenente il jira id
+      */
     public static String parseId(String toParse) throws SecurityException{
         StringBuilder parsed = new StringBuilder();        
         Integer j = 0;
@@ -114,7 +134,18 @@ public class DataRetrieve
         }
         return parsed.toString();
     }
-
+    
+    /**
+     * Metodo cercare un determinato valore in una colonna del csv. Il csv viene letto riga per riga
+     * ed ad ognuna di queste viene fatto il parsing per colonna. Ogni riga viene confrontato il 
+     * contenuto della colonna specificata con la stringa che si sta cercando, alla fine del file
+     * viene restituito un array con il contenuto di tutte le righe contenenti la stringa cercata.
+     * 
+     * @param searchColumnIndex indice della colonna del csv (0 bound)
+     * @param searchString stringa da cercare
+     * @param file nome del file csv in cui cercare
+     * @return resultRow array di stringhe contenente le righe che contengono searchString
+     */
     public static String[] searchCsvLine(int searchColumnIndex, String searchString, String file) throws IOException {
         String[] resultRow = new String[0];
         Integer i = 0;
@@ -137,7 +168,19 @@ public class DataRetrieve
         return resultRow;
     }
 
-    public static void cvsPopulation(Integer i, JSONArray json, FileWriter commitWriter) throws IOException{
+    /**
+     * Metodo per ottenere i dati necessari dal jsonArray contenente il informazioni dei ticket 
+     * jira ed inserirli, tramite la chiave jira id nel csv con le informazioni dei commit.
+     * Vengono ricavati i valori delle Affected Version, Fixed Version, id ticket jira. Il metodo
+     * searchCsvLine trova la riga del csv dei commit che risolve il ticket in questione.
+     * Quest'ultima insieme ai dati del ticket vengono scritti sul csv specificato dal file writer.
+     * 
+     * @param i indice dell'arrayJson in cui leggere i dati
+     * @param json JsonArray contenente le informazioni di tutti i ticket
+     * @param commitWriter File Writer in cui copiare dati del commit associati a dati del ticket
+     * @return void
+     */
+    public static void jiraJsonArray(Integer i, JSONArray json, FileWriter jiraWriter) throws IOException{
         String jsonKey = "fields";
 
         JSONArray versionArray = json.getJSONObject(i%1000).getJSONObject(jsonKey).getJSONArray("versions");
@@ -164,13 +207,21 @@ public class DataRetrieve
 
             if(commit[k] != null){
                 commit[k] = commit[k].replace("\n", " ");
-                commitWriter.append(commit[k]+","+versionStr+","+fixVersionStr+"\n");
+                jiraWriter.append(commit[k]+","+versionStr+","+fixVersionStr+"\n");
             }
         }
     }
 
-
-    public static void jiraData(FileWriter commitWriter) throws JSONException, IOException{
+    /** 
+    * Metodo per ottenere dal jsonObject dei ticket jira il jsonArray "issue" cotenente i dati utili.
+    * Viene fatta la query su tutti i ticket di tipo BUG con stato CLOSED o RESOLVED e resolution FIXED.
+    * Nella stringa url viene specificata la query che il metodo readJsonObjectFromUrl esegue.
+    * Infine viene chimato il metodo jiraJsonArray per estrarre dal jsonArray i dati.
+    *
+    * @param jiraWriter FileWriter del csv su cui verranno scritti i dati necessari dei ticket jira
+    * @return void
+    */
+    public static void jiraData(FileWriter jiraWriter) throws JSONException, IOException{
         Integer j = 0;
         Integer i = 0;
         Integer total = 1;
@@ -185,12 +236,20 @@ public class DataRetrieve
             total = jsonObj.getInt("total");
 
             for (; i < total && i < j; i++) {
-                cvsPopulation(i, json, commitWriter);
+                jiraJsonArray(i, json, jiraWriter);
             }  
       } while (i < total);
     }
 
-
+    /** 
+    * Metodo per ottenere dal jsonArray dei commit, scaricato da github, le informazioni necessarie:
+    * data, messaggio, sha del commit. Nella stringa url viene specificata la query che il metodo
+    * readJsonArrayFromUrl esegue tramite chiamata get. Dal campo "message", con il metodo parseId,
+    * viene ricavato l'id del corrispondente ticket jira di cui il commit è risolutivo.
+    *
+    * @param commitWriter FileWriter del csv su cui verranno scritti i dati necessari dei commit
+    * @return void
+    */
     public static void commitData(FileWriter commitWriter) throws IOException, InterruptedException{
         Integer i = 1; 
         Integer l = 0;
@@ -213,6 +272,15 @@ public class DataRetrieve
         } while(l != 0);
     }
 
+    /**
+    * Metodo che gestisce i due file prodotti dalla classe. Crea i file csv che conterranno
+    * i dati dei commit provenienti da github ed i dati dei tiket da jira. Invoca i metodi
+    * che popleranno i csv. Ciò avviene solo se le due variabili booleane DOWNLOAD_COMMIT e
+    * DOWNLOAD_JIRA sono poste a true. Nel caso siano false non viene effettuato il download
+    * dei dati assumendo che i file siano già stati popolati in precedenza.
+    *
+    * @return void
+    */
     public static void fileHandler() throws IOException, InterruptedException{
 
         if(DOWNLOAD_COMMIT){

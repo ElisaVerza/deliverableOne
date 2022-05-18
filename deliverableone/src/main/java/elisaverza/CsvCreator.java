@@ -27,7 +27,7 @@ public class CsvCreator {
     private static final String CSV_METHRICS = "data.csv";
     private static final boolean DOWNLOAD_FILES = true;
 
-
+    //TODO: togliere da ticketdata.csv tutti i file con affected = fixed version
     public static String[] projectVersions() throws JSONException, IOException, ParseException, InterruptedException{
         String url = "https://issues.apache.org/jira/rest/api/2/project/"+PRJ_NAME+"/";
         Integer i;
