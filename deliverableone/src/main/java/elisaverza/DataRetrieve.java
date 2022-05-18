@@ -27,6 +27,13 @@ public class DataRetrieve
     private static final boolean DOWNLOAD_JIRA = false;
     private static final String AUTH_CODE = "/home/ella/vsWorkspace/auth_code.txt";
 
+    /**
+     * Metodo che permette di autenticare le richieste fatte a github per evitare 
+     * il limit rate sulle chiamate get.
+     * 
+     * @param url indirizzo della richiesta
+     * @return input stream reader
+     */
     public static InputStreamReader auth(URL url) throws IOException{
         String token;
         URLConnection uc = url.openConnection();
@@ -44,6 +51,13 @@ public class DataRetrieve
         return new InputStreamReader(uc.getInputStream());
     }
 
+    /**
+     * Metodo che prende in input un buffered reader e ne restituisce il contenuto
+     * in formato stringa.
+     *  
+     * @param rd buffered reader da cui leggere
+     * @return contenuto del buffered reader il formato stringa
+     */
     private static String readAll(BufferedReader rd) throws IOException {
         StringBuilder sb = new StringBuilder();
         int cp;
@@ -274,7 +288,7 @@ public class DataRetrieve
 
     /**
     * Metodo che gestisce i due file prodotti dalla classe. Crea i file csv che conterranno
-    * i dati dei commit provenienti da github ed i dati dei tiket da jira. Invoca i metodi
+    * i dati dei commit provenienti da github ed i dati dei ticket da jira. Invoca i metodi
     * che popleranno i csv. Ciò avviene solo se le due variabili booleane DOWNLOAD_COMMIT e
     * DOWNLOAD_JIRA sono poste a true. Nel caso siano false non viene effettuato il download
     * dei dati assumendo che i file siano già stati popolati in precedenza.
