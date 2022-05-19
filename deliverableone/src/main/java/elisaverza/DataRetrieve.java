@@ -19,12 +19,14 @@ import org.json.JSONObject;
 
 public class DataRetrieve 
 {
-    private static final String CSV_COMMIT = "commitdata.csv";
-    private static final String CSV_JIRA = "ticketdata.csv";
+    private static final String CSV_COMMIT = "01-commitdata.csv";
+    private static final String CSV_JIRA = "02-ticketdata.csv";
+    private static final String CSV_VERSIONS = "03-versionsdata.csv";
     private static final String PRJ_NAME = "SYNCOPE";
     private static final String USERNAME = "ElisaVerza";
     private static final boolean DOWNLOAD_COMMIT = false;
     private static final boolean DOWNLOAD_JIRA = false;
+    private static final boolean DOWNLOAD_VERSIONS = false;
     private static final String AUTH_CODE = "/home/ella/vsWorkspace/auth_code.txt";
 
     /**
@@ -133,16 +135,17 @@ public class DataRetrieve
     public static String parseId(String toParse) throws SecurityException{
         StringBuilder parsed = new StringBuilder();        
         Integer j = 0;
-        Integer i = 0;
 
         if(toParse.contains(PRJ_NAME)){
             j = toParse.indexOf(PRJ_NAME);
-            i = j+8;
-            while(toParse.length()>j && j<=i){
-                if(toParse.length()>j+8 && Character.isDigit(toParse.charAt(j+8))){
-                    i = j+8;
+            j=j+8;
+            parsed.append("SYNCOPE-");
+
+            while(toParse.length()>j){
+                if(toParse.length()>j && Character.isDigit(toParse.charAt(j))){
+                    parsed.append(toParse.charAt(j));
                 }
-                parsed.append(toParse.charAt(j));
+                else{break;}
                 j++;
             }
         }
@@ -199,6 +202,7 @@ public class DataRetrieve
 
         JSONArray versionArray = json.getJSONObject(i%1000).getJSONObject(jsonKey).getJSONArray("versions");
         JSONArray fixVersionArray = json.getJSONObject(i%1000).getJSONObject(jsonKey).getJSONArray("fixVersions");
+        String ovDate = json.getJSONObject(i%1000).getJSONObject(jsonKey).getString("created");
         String[] version = new String[versionArray.length()];
         String[] fixVersion = new String[fixVersionArray.length()];
         Integer k = 0;
@@ -221,7 +225,7 @@ public class DataRetrieve
 
             if(commit[k] != null){
                 commit[k] = commit[k].replace("\n", " ");
-                jiraWriter.append(commit[k]+","+versionStr+","+fixVersionStr+"\n");
+                jiraWriter.append(commit[k]+","+versionStr+","+fixVersionStr+","+ovDate+"\n");
             }
         }
     }
@@ -272,19 +276,41 @@ public class DataRetrieve
         String sha;
         String jiraId;
         do{
+            System.out.println(i);
+
             String url = "https://api.github.com/repos/apache/"+PRJ_NAME+"/commits?page="+i.toString()+"&per_page=100";
             JSONArray jPage = new JSONArray(readJsonArrayFromUrl(url, true));
             l = jPage.length();
             Thread.sleep(1000);
             for(k=0; k<l; k++){
-                date = jPage.getJSONObject(k).getJSONObject("commit").getJSONObject("committer").getString("date");
                 jiraId = parseId(jPage.getJSONObject(k).getJSONObject("commit").getString("message"));
-                sha = jPage.getJSONObject(k).getString("sha");
-                commitWriter.append(date + "," +sha+","+ jiraId +"\n");
+                if(jiraId.contains(PRJ_NAME)){
+                    date = jPage.getJSONObject(k).getJSONObject("commit").getJSONObject("committer").getString("date");
+                    sha = jPage.getJSONObject(k).getString("sha");
+                    commitWriter.append(date + "," +sha+","+ jiraId +"\n");
+                }
             }                
             i++;
         } while(l != 0);
     }
+
+    //TODO: javadoc
+    public static void versionsData(FileWriter versionsWriter) throws JSONException, IOException{
+        String url = "https://issues.apache.org/jira/rest/api/2/project/"+PRJ_NAME+"/";
+        Integer len;
+        Integer i;
+        JSONObject jsonObj = readJsonObjFromUrl(url, false);
+        JSONArray json = new JSONArray(jsonObj.getJSONArray("versions"));
+        len = json.length()/2;
+        for(i = 0; i<len; i++){
+            if(json.getJSONObject(i).getBoolean("released")){
+                versionsWriter.append(json.getJSONObject(i).getString("name")+","+
+                                      json.getJSONObject(i).getString("releaseDate")+"\n");
+            }
+        }
+
+    }
+
 
     /**
     * Metodo che gestisce i due file prodotti dalla classe. Crea i file csv che conterranno
@@ -297,6 +323,13 @@ public class DataRetrieve
     */
     public static void fileHandler() throws IOException, InterruptedException{
 
+        if(DOWNLOAD_VERSIONS){
+            File versionsFile = new File(CSV_VERSIONS);
+                try(FileWriter versionsWriter = new FileWriter(versionsFile)){
+                    versionsWriter.append("name, release date\n");
+                    versionsData(versionsWriter);    
+                }
+        }
         if(DOWNLOAD_COMMIT){
             File commitFile = new File(CSV_COMMIT);
             try(FileWriter commitWriter = new FileWriter(commitFile)){
@@ -312,6 +345,7 @@ public class DataRetrieve
             }
         }
     }
+
 
     public static void main(String[] args) throws IOException, InterruptedException{
         fileHandler();

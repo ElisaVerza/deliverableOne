@@ -23,56 +23,37 @@ import org.json.JSONObject;
 
 public class CsvCreator {
     public static final String PRJ_NAME = "SYNCOPE";
-    private static final String CSV_COMMIT = "commitdata.csv";
-    private static final String CSV_METHRICS = "data.csv";
+    private static final String CSV_JIRA = "02-ticketdata.csv";
+    private static final String CSV_VERSIONS = "03-versionsdata.csv";
+    private static final String CSV_METHRICS = "04-data.csv";
     private static final boolean DOWNLOAD_FILES = true;
 
 
-    /**
-     * 
-     * @return
-     */
-    public static String[] projectVersions() throws JSONException, IOException, ParseException, InterruptedException{
-        String url = "https://issues.apache.org/jira/rest/api/2/project/"+PRJ_NAME+"/";
-        Integer i;
-        Integer len;
-        JSONObject jsonObj = DataRetrieve.readJsonObjFromUrl(url, false);
-        JSONArray json = new JSONArray(jsonObj.getJSONArray("versions"));
-        len = json.length();
-        String[] versions = new String[len/2+1];
+    public static void downloadFiles() throws IOException, ParseException{
+        Integer k;
+        Integer i = 0;
 
-            for(i = 0; i<len; i++){
-                if(json.getJSONObject(i).getBoolean("released")){
-                    versions[i] = json.getJSONObject(i).getString("name");
-                    if(DOWNLOAD_FILES){
-                        downloadFiles(i, json, versions);
+        try(BufferedReader brVd = new BufferedReader(new FileReader(CSV_VERSIONS))){
+            String lineVd = brVd.readLine();
+            String [] commitSha = new String[0];
+            try(FileWriter csvWriter = new FileWriter(CSV_METHRICS)){
+                while((lineVd = brVd.readLine()) != null ) {
+                    String[] valuesVd = lineVd.split(",");
+                    String[] newArray = new String[commitSha.length + 1];
+                    System.arraycopy(commitSha, 0, newArray, 0, commitSha.length);
+                    commitSha = newArray;
+                    commitSha[i] = dateSearch(valuesVd[1]);
+                    String filesUrl = "https://api.github.com/repos/apache/"+PRJ_NAME+"/git/trees/"+commitSha[i]+"?recursive=1";
+                    JSONObject filesJsonObj = DataRetrieve.readJsonObjFromUrl(filesUrl, true);
+                    JSONArray jsonFiles = new JSONArray(filesJsonObj.getJSONArray("tree"));
+
+                    for(k = 0; k<jsonFiles.length(); k++){
+                        if(jsonFiles.getJSONObject(k).getString("path").contains(".java")){
+                            csvWriter.append(valuesVd[0]+","+jsonFiles.getJSONObject(k).getString("path")+","+"No\n");
+                        }
                     }
                 }
-                if(i == len/2){
-                    return versions;
-                }
-                Thread.sleep(1000);
-            }
-        
-        return versions;
-    }
-
-    public static void downloadFiles(int i, JSONArray json, String[] versions) throws IOException, ParseException{
-        Integer k;
-        Integer len = json.length();
-        String[] dateStr = new String[len/2+1];
-        String[] commitSha = new String[len/2+1];
-        try(FileWriter csvWriter = new FileWriter(CSV_METHRICS)){
-            dateStr[i] = json.getJSONObject(i).getString("releaseDate");
-            commitSha[i] = dateSearch(dateStr[i]);
-            String filesUrl = "https://api.github.com/repos/apache/"+PRJ_NAME+"/git/trees/"+commitSha[i]+"?recursive=1";
-            JSONObject filesJsonObj = DataRetrieve.readJsonObjFromUrl(filesUrl, true);
-            JSONArray jsonFiles = new JSONArray(filesJsonObj.getJSONArray("tree"));
-
-            for(k = 0; k<jsonFiles.length(); k++){
-                if(jsonFiles.getJSONObject(k).getString("path").contains(".java")){
-                    csvWriter.append(versions[i]+","+jsonFiles.getJSONObject(k).getString("path")+","+"No\n");
-                }
+                i++;
             }
         }
     }
@@ -118,9 +99,9 @@ public class CsvCreator {
      * @return void
      */
     public static void bugginess() throws IOException, JSONException, ParseException, InterruptedException, CsvException{
-        Integer i;
-        String[] versions = projectVersions();
-        for(i = 0; i<versions.length; i++){
+        //Integer i;
+        downloadFiles();
+        /*for(i = 0; i<versions.length; i++){
             Integer j = 0;
             try(BufferedReader br = new BufferedReader(new FileReader("ticketdata.csv"))){
                 String line = br.readLine();
@@ -131,7 +112,7 @@ public class CsvCreator {
                     j++;
                 }
             }
-        }
+        }*/
     }
 
     /**
@@ -163,7 +144,7 @@ public class CsvCreator {
 
     public static String dateSearch(String dateStr) throws ParseException, IOException{
         Date releaseDate = new SimpleDateFormat("yyyy-MM-dd").parse(dateStr);
-        File file = new File(CSV_COMMIT);
+        File file = new File(CSV_JIRA);
         Integer i;
         String lastCommitSha = " ";
         try(BufferedReader br = new BufferedReader(new FileReader(file))){

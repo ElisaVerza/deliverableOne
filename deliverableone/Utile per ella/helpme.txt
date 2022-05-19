@@ -1,0 +1,2 @@
+da ogni commit fixed (tiketdata.csv) prendere sha commit risolutivo e affected/fixed version
+query github file toccati commit risolutivo 
