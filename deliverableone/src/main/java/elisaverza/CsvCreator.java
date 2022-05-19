@@ -5,6 +5,7 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.text.DateFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.time.Instant;
@@ -39,17 +40,22 @@ public class CsvCreator {
             try(FileWriter csvWriter = new FileWriter(CSV_METHRICS)){
                 while((lineVd = brVd.readLine()) != null ) {
                     String[] valuesVd = lineVd.split(",");
-                    String[] newArray = new String[commitSha.length + 1];
-                    System.arraycopy(commitSha, 0, newArray, 0, commitSha.length);
-                    commitSha = newArray;
-                    commitSha[i] = dateSearch(valuesVd[1]);
-                    String filesUrl = "https://api.github.com/repos/apache/"+PRJ_NAME+"/git/trees/"+commitSha[i]+"?recursive=1";
-                    JSONObject filesJsonObj = DataRetrieve.readJsonObjFromUrl(filesUrl, true);
-                    JSONArray jsonFiles = new JSONArray(filesJsonObj.getJSONArray("tree"));
 
-                    for(k = 0; k<jsonFiles.length(); k++){
-                        if(jsonFiles.getJSONObject(k).getString("path").contains(".java")){
-                            csvWriter.append(valuesVd[0]+","+jsonFiles.getJSONObject(k).getString("path")+","+"No\n");
+                    Date currentVersion = new SimpleDateFormat("yyyy-MM-dd").parse(valuesVd[1]);
+                    Date lastVersion = DataRetrieve.getLastRelease();
+                    if(lastVersion.compareTo(currentVersion) >= 0){
+                        String[] newArray = new String[commitSha.length + 1];
+                        System.arraycopy(commitSha, 0, newArray, 0, commitSha.length);
+                        commitSha = newArray;
+                        commitSha[i] = dateSearch(valuesVd[1]);
+                        String filesUrl = "https://api.github.com/repos/apache/"+PRJ_NAME+"/git/trees/"+commitSha[i]+"?recursive=1";
+                        JSONObject filesJsonObj = DataRetrieve.readJsonObjFromUrl(filesUrl, true);
+                        JSONArray jsonFiles = new JSONArray(filesJsonObj.getJSONArray("tree"));
+
+                        for(k = 0; k<jsonFiles.length(); k++){
+                            if(jsonFiles.getJSONObject(k).getString("path").contains(".java")){
+                                csvWriter.append(valuesVd[0]+","+jsonFiles.getJSONObject(k).getString("path")+","+"No\n");
+                            }
                         }
                     }
                 }
@@ -57,6 +63,7 @@ public class CsvCreator {
             }
         }
     }
+
 
     /**
      * Metodo che individua tutti i file buggy di un determinato commit se la versione indicata
@@ -99,22 +106,28 @@ public class CsvCreator {
      * @return void
      */
     public static void bugginess() throws IOException, JSONException, ParseException, InterruptedException, CsvException{
-        //Integer i;
         downloadFiles();
-        /*for(i = 0; i<versions.length; i++){
-            Integer j = 0;
-            try(BufferedReader br = new BufferedReader(new FileReader("ticketdata.csv"))){
-                String line = br.readLine();
-                while ( (line = br.readLine()) != null ) {
-                    if(versions[i]!=null){
-                        fileTouched(line, j, versions[i]);
+
+        /*try(BufferedReader brTd = new BufferedReader(new FileReader(CSV_JIRA));
+            BufferedReader brVd = new BufferedReader(new FileReader(CSV_VERSIONS));){
+            String lineTd = brTd.readLine();
+            String lineVd = brVd.readLine();
+            while( (lineVd = brVd.readLine()) != null ){
+                String[] valuesVd = lineVd.split(",");
+                String version = valuesVd[0];
+                Integer j = 0;
+
+                while ( (lineTd = brTd.readLine()) != null ) {
+                    System.out.println("Version: "+version+"riga: "+j);
+                    if(version!=null){
+                        fileTouched(lineTd, j, version);
                     }
                     j++;
                 }
             }
         }*/
     }
-
+    
     /**
     * Update CSV by row and column
     * 

@@ -9,9 +9,12 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.URL;
 import java.net.URLConnection;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.Base64;
-
+import java.util.Date;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -28,6 +31,19 @@ public class DataRetrieve
     private static final boolean DOWNLOAD_JIRA = false;
     private static final boolean DOWNLOAD_VERSIONS = false;
     private static final String AUTH_CODE = "/home/ella/vsWorkspace/auth_code.txt";
+
+    public static Date getLastRelease() throws IOException, ParseException{
+        Date last = new Date();
+        try(BufferedReader br = new BufferedReader(new FileReader(CSV_VERSIONS))){
+            String line = br.readLine();
+            while ( (line = br.readLine()) != null ) {
+                String[] values = line.split(",");
+                last = new SimpleDateFormat("yyyy-MM-dd").parse(values[1]);
+
+            }
+        }
+        return last;
+    }
 
     /**
      * Metodo che permette di autenticare le richieste fatte a github per evitare 
@@ -264,17 +280,20 @@ public class DataRetrieve
     * data, messaggio, sha del commit. Nella stringa url viene specificata la query che il metodo
     * readJsonArrayFromUrl esegue tramite chiamata get. Dal campo "message", con il metodo parseId,
     * viene ricavato l'id del corrispondente ticket jira di cui il commit è risolutivo.
+    * Vengono presi solo i commit della prima metà release.
     *
     * @param commitWriter FileWriter del csv su cui verranno scritti i dati necessari dei commit
     * @return void
+     * @throws ParseException
     */
-    public static void commitData(FileWriter commitWriter) throws IOException, InterruptedException{
+    public static void commitData(FileWriter commitWriter) throws IOException, InterruptedException, ParseException{
         Integer i = 1; 
         Integer l = 0;
         Integer k;
         String date;
         String sha;
         String jiraId;
+        Date lastRelease = getLastRelease();
         do{
             System.out.println(i);
 
@@ -284,8 +303,9 @@ public class DataRetrieve
             Thread.sleep(1000);
             for(k=0; k<l; k++){
                 jiraId = parseId(jPage.getJSONObject(k).getJSONObject("commit").getString("message"));
-                if(jiraId.contains(PRJ_NAME)){
-                    date = jPage.getJSONObject(k).getJSONObject("commit").getJSONObject("committer").getString("date");
+                date = jPage.getJSONObject(k).getJSONObject("commit").getJSONObject("committer").getString("date");
+                Date commitDate = Date.from(Instant.parse(date));
+                if(jiraId.contains(PRJ_NAME) && lastRelease.compareTo(commitDate)>=0){
                     sha = jPage.getJSONObject(k).getString("sha");
                     commitWriter.append(date + "," +sha+","+ jiraId +"\n");
                 }
@@ -294,7 +314,12 @@ public class DataRetrieve
         } while(l != 0);
     }
 
-    //TODO: javadoc
+    /**
+     * Metodo che restituisce, in formato Data, la data della release più recente tra quelle prese
+     * in considerazione, ovvero la metà
+     * 
+     * @param versionsWriter File writer del csv contenente tutte le release con nome e data
+     */
     public static void versionsData(FileWriter versionsWriter) throws JSONException, IOException{
         String url = "https://issues.apache.org/jira/rest/api/2/project/"+PRJ_NAME+"/";
         Integer len;
@@ -320,8 +345,9 @@ public class DataRetrieve
     * dei dati assumendo che i file siano già stati popolati in precedenza.
     *
     * @return void
+     * @throws ParseException
     */
-    public static void fileHandler() throws IOException, InterruptedException{
+    public static void fileHandler() throws IOException, InterruptedException, ParseException{
 
         if(DOWNLOAD_VERSIONS){
             File versionsFile = new File(CSV_VERSIONS);
@@ -347,7 +373,7 @@ public class DataRetrieve
     }
 
 
-    public static void main(String[] args) throws IOException, InterruptedException{
+    public static void main(String[] args) throws IOException, InterruptedException, ParseException{
         fileHandler();
     }
 }
