@@ -12,10 +12,17 @@ import java.net.URLConnection;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.Date;
+import java.util.List;
 
+import com.opencsv.CSVReader;
+import com.opencsv.exceptions.CsvValidationException;
+
+import org.javatuples.Pair;
+import org.javatuples.Tuple;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -27,9 +34,9 @@ public class DataRetrieve
     private static final String CSV_VERSIONS = "03-versionsdata.csv";
     private static final String PRJ_NAME = "SYNCOPE";
     private static final String USERNAME = "ElisaVerza";
-    private static final boolean DOWNLOAD_COMMIT = false;
-    private static final boolean DOWNLOAD_JIRA = false;
-    private static final boolean DOWNLOAD_VERSIONS = false;
+    private static final boolean DOWNLOAD_COMMIT = true;
+    private static final boolean DOWNLOAD_JIRA = true;
+    private static final boolean DOWNLOAD_VERSIONS = true;
     private static final String AUTH_CODE = "/home/ella/vsWorkspace/auth_code.txt";
 
     public static Date getLastRelease() throws IOException, ParseException{
@@ -52,6 +59,7 @@ public class DataRetrieve
      * @param url indirizzo della richiesta
      * @return input stream reader
      */
+
     public static InputStreamReader auth(URL url) throws IOException{
         String token;
         URLConnection uc = url.openConnection();
@@ -201,6 +209,42 @@ public class DataRetrieve
         return resultRow;
     }
 
+    public static Boolean validTicket(String iVersion, String ovDate) throws IOException, ParseException{
+        String [] versionDate = searchCsvLine(1, iVersion, CSV_VERSIONS);
+        Date initialVersion = new SimpleDateFormat("yyyy-MM-dd").parse(versionDate[1]);
+        Date openingVersion = Date.from(Instant.parse(ovDate));
+
+        return initialVersion.compareTo(openingVersion)<=0;
+    }
+
+    public static Tuple minVersion(String[] versionArray) throws IOException, CsvValidationException{
+        List<List<String>> csv = csvToList(CSV_VERSIONS);
+        Integer i;
+        Integer j = 0;
+        Integer lastIndex = csv.get(0).size()+1;
+        for(i=0; i<versionArray.length; i++){
+            for(j=0; j<csv.get(0).size(); j++){
+                if(versionArray[i].equals(csv.get(0).get(j)) && j<lastIndex){
+                    lastIndex = j;
+                    break;
+                }
+            }
+        }
+        return Pair.with(lastIndex, csv.get(0).get(lastIndex));
+    }
+    
+    public static List<List<String>> csvToList(String csvFile) throws IOException, CsvValidationException{
+        List<List<String>> records = new ArrayList<>();
+        try (CSVReader csvReader = new CSVReader(new FileReader(csvFile));) {
+            String[] values = null;
+            while ((values = csvReader.readNext()) != null) {
+                records.add(Arrays.asList(values));
+            }
+        }  
+      return records;
+    }
+
+
     /**
      * Metodo per ottenere i dati necessari dal jsonArray contenente il informazioni dei ticket 
      * jira ed inserirli, tramite la chiave jira id nel csv con le informazioni dei commit.
@@ -212,8 +256,10 @@ public class DataRetrieve
      * @param json JsonArray contenente le informazioni di tutti i ticket
      * @param commitWriter File Writer in cui copiare dati del commit associati a dati del ticket
      * @return void
+     * @throws ParseException
+     * @throws CsvValidationException
      */
-    public static void jiraJsonArray(Integer i, JSONArray json, FileWriter jiraWriter) throws IOException{
+    public static void jiraJsonArray(Integer i, JSONArray json, FileWriter jiraWriter) throws IOException, ParseException, CsvValidationException{
         String jsonKey = "fields";
 
         JSONArray versionArray = json.getJSONObject(i%1000).getJSONObject(jsonKey).getJSONArray("versions");
@@ -222,26 +268,40 @@ public class DataRetrieve
         String[] version = new String[versionArray.length()];
         String[] fixVersion = new String[fixVersionArray.length()];
         Integer k = 0;
+        Integer j = 0;
+
         while(versionArray.length()!=0 && k<versionArray.length()){    
             version[k] = versionArray.getJSONObject(k).getString("name");
             k++;
         }
+
+        Tuple oldestAffected = minVersion(version);
+
         k=0;
         while(fixVersionArray.length()!=0 && k<fixVersionArray.length()){    
-            fixVersion[k] = fixVersionArray.getJSONObject(k).getString("name");
+            String currFixVersion = fixVersionArray.getJSONObject(k).getString("name");
+            //Controllo sulle fixed versions per vedere se sono released
+            Boolean isReleasedVersion = searchCsvLine(0, currFixVersion, CSV_VERSIONS)!= null;
+            if(Boolean.TRUE.equals(isReleasedVersion)){
+                fixVersion[j] = currFixVersion;
+                j++;
+            }
             k++;
         }
-        String key = json.getJSONObject(i%1000).get("key").toString();
-        String[] commit = searchCsvLine(2, key, CSV_COMMIT);
-        String versionStr = Arrays.toString(version);
-        versionStr = versionStr.replace(",", " ");
-        String fixVersionStr = Arrays.toString(fixVersion);
-        fixVersionStr = fixVersionStr.replace(",", " ");
-        for(k=0;k<commit.length;k++){
 
-            if(commit[k] != null){
-                commit[k] = commit[k].replace("\n", " ");
-                jiraWriter.append(commit[k]+","+versionStr+","+fixVersionStr+","+ovDate+"\n");
+        Tuple oldestFixed = minVersion(version);
+        //Controllo per vedere se è un post release bug
+        Boolean isPostReleaseTicket = oldestAffected.getValue(1).equals(oldestFixed.getValue(1));
+        //Controllo per verificare che ov<iv
+        Boolean isValid = validTicket(version[0], ovDate);
+        if(Boolean.FALSE.equals(isPostReleaseTicket) && Boolean.TRUE.equals(isValid)){
+            String key = json.getJSONObject(i%1000).get("key").toString();
+            String[] commit = searchCsvLine(2, key, CSV_COMMIT);
+            for(k=0;k<commit.length;k++){
+                if(commit[k] != null){
+                    commit[k] = commit[k].replace("\n", " ");
+                    jiraWriter.append(commit[k]+","+oldestAffected.getValue(1)+","+oldestFixed.getValue(1)+","+ovDate+"\n");
+                }
             }
         }
     }
@@ -254,8 +314,10 @@ public class DataRetrieve
     *
     * @param jiraWriter FileWriter del csv su cui verranno scritti i dati necessari dei ticket jira
     * @return void
+     * @throws ParseException
+     * @throws CsvValidationException
     */
-    public static void jiraData(FileWriter jiraWriter) throws JSONException, IOException{
+    public static void jiraData(FileWriter jiraWriter) throws JSONException, IOException, ParseException, CsvValidationException{
         Integer j = 0;
         Integer i = 0;
         Integer total = 1;
@@ -346,8 +408,10 @@ public class DataRetrieve
     *
     * @return void
      * @throws ParseException
+     * @throws JSONException
+     * @throws CsvValidationException
     */
-    public static void fileHandler() throws IOException, InterruptedException, ParseException{
+    public static void fileHandler() throws IOException, InterruptedException, ParseException, CsvValidationException, JSONException{
 
         if(DOWNLOAD_VERSIONS){
             File versionsFile = new File(CSV_VERSIONS);
@@ -373,7 +437,7 @@ public class DataRetrieve
     }
 
 
-    public static void main(String[] args) throws IOException, InterruptedException, ParseException{
+    public static void main(String[] args) throws IOException, InterruptedException, ParseException, CsvValidationException, JSONException{
         fileHandler();
     }
 }
