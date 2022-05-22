@@ -5,7 +5,6 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.text.DateFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.time.Instant;
@@ -27,7 +26,6 @@ public class CsvCreator {
     private static final String CSV_JIRA = "02-ticketdata.csv";
     private static final String CSV_VERSIONS = "03-versionsdata.csv";
     private static final String CSV_METHRICS = "04-data.csv";
-    private static final boolean DOWNLOAD_FILES = true;
 
 
     public static void downloadFiles() throws IOException, ParseException{

@@ -34,10 +34,11 @@ public class DataRetrieve
     private static final String CSV_VERSIONS = "03-versionsdata.csv";
     private static final String PRJ_NAME = "SYNCOPE";
     private static final String USERNAME = "ElisaVerza";
-    private static final boolean DOWNLOAD_COMMIT = true;
+    private static final boolean DOWNLOAD_COMMIT = false;
     private static final boolean DOWNLOAD_JIRA = true;
-    private static final boolean DOWNLOAD_VERSIONS = true;
+    private static final boolean DOWNLOAD_VERSIONS = false;
     private static final String AUTH_CODE = "/home/ella/vsWorkspace/auth_code.txt";
+    private static final String DATE_FORMAT = "yyyy-MM-dd";
 
     public static Date getLastRelease() throws IOException, ParseException{
         Date last = new Date();
@@ -45,11 +46,29 @@ public class DataRetrieve
             String line = br.readLine();
             while ( (line = br.readLine()) != null ) {
                 String[] values = line.split(",");
-                last = new SimpleDateFormat("yyyy-MM-dd").parse(values[1]);
+                last = new SimpleDateFormat(DATE_FORMAT).parse(values[1]);
 
             }
         }
         return last;
+    }
+
+    public static String getVersionByDate(String date) throws IOException, ParseException{
+        Date openingToDate = new SimpleDateFormat(DATE_FORMAT).parse(date);
+        Date versionToDate = new Date();
+        String version = " ";
+        try(BufferedReader br = new BufferedReader(new FileReader(CSV_VERSIONS))){
+            String line = br.readLine();
+            while ( (line = br.readLine()) != null ) {
+                String[] values = line.split(",");
+                versionToDate = new SimpleDateFormat(DATE_FORMAT).parse(values[1]);
+                if(versionToDate.compareTo(openingToDate)>=0){
+                    version = values[0];
+                    break;
+                }
+            }
+        }
+        return version;
     }
 
     /**
@@ -210,27 +229,33 @@ public class DataRetrieve
     }
 
     public static Boolean validTicket(String iVersion, String ovDate) throws IOException, ParseException{
-        String [] versionDate = searchCsvLine(1, iVersion, CSV_VERSIONS);
-        Date initialVersion = new SimpleDateFormat("yyyy-MM-dd").parse(versionDate[1]);
-        Date openingVersion = Date.from(Instant.parse(ovDate));
-
-        return initialVersion.compareTo(openingVersion)<=0;
+        Boolean valid = false;
+        String [] versionDate = searchCsvLine(0, iVersion, CSV_VERSIONS);
+        String[] values = versionDate[0].split(",");
+        if(values.length != 0){
+            Date initialVersion = new SimpleDateFormat(DATE_FORMAT).parse(values[1]);
+            Date openingVersion = new SimpleDateFormat(DATE_FORMAT).parse(ovDate.substring(0, 10));
+            valid = initialVersion.compareTo(openingVersion)<=0;
+        }
+        return valid;
     }
 
     public static Tuple minVersion(String[] versionArray) throws IOException, CsvValidationException{
         List<List<String>> csv = csvToList(CSV_VERSIONS);
         Integer i;
-        Integer j = 0;
-        Integer lastIndex = csv.get(0).size()+1;
+        Integer j;
+        Integer lastIndex = csv.size()+1;
+        Tuple lastVer = Pair.with(0, " ");
         for(i=0; i<versionArray.length; i++){
-            for(j=0; j<csv.get(0).size(); j++){
-                if(versionArray[i].equals(csv.get(0).get(j)) && j<lastIndex){
+            for(j=1; j<csv.size(); j++){
+                if(versionArray[i]!=null && versionArray[i].equals(csv.get(j).get(0)) && j<lastIndex){
                     lastIndex = j;
+                    lastVer = Pair.with(lastIndex, csv.get(lastIndex).get(0));
                     break;
                 }
             }
         }
-        return Pair.with(lastIndex, csv.get(0).get(lastIndex));
+        return lastVer;
     }
     
     public static List<List<String>> csvToList(String csvFile) throws IOException, CsvValidationException{
@@ -242,6 +267,48 @@ public class DataRetrieve
             }
         }  
       return records;
+    }
+
+    public static String[] findAffected(JSONArray versionArray) throws IOException{
+        Integer j = 0;
+        Integer i = 0;
+        String[] version = new String[0];
+
+        while(versionArray.length()!=0 && i<versionArray.length()){  
+            String currAffVersion = versionArray.getJSONObject(i).getString("name");
+            Boolean isReleasedVersion = searchCsvLine(0, currAffVersion, CSV_VERSIONS).length != 0;
+            if(Boolean.TRUE.equals(isReleasedVersion)){
+                String[] newArray = new String[version.length + 1];
+                System.arraycopy(version, 0, newArray, 0, version.length);
+                version = newArray;
+                version[j] = currAffVersion;
+                j++;
+            }
+            i++;
+        }
+        return version;
+    }
+
+    public static String[] findFixed(JSONArray fixVersionArray) throws IOException{
+        Integer i = 0;
+        Integer j = 0;
+        String[] fixVersion = new String[0];
+
+        while(fixVersionArray.length()!=0 && i<fixVersionArray.length()){    
+            String currFixVersion = fixVersionArray.getJSONObject(i).getString("name");
+            //Controllo sulle fixed versions per vedere se sono released
+            Boolean isReleasedVersion = searchCsvLine(0, currFixVersion, CSV_VERSIONS).length != 0;
+            if(Boolean.TRUE.equals(isReleasedVersion)){
+                String[] newArray = new String[fixVersion.length + 1];
+                System.arraycopy(fixVersion, 0, newArray, 0, fixVersion.length);
+                fixVersion = newArray;
+                fixVersion[j] = currFixVersion;
+                j++;
+            }
+            i++;
+        }
+
+        return fixVersion;
     }
 
 
@@ -258,42 +325,35 @@ public class DataRetrieve
      * @return void
      * @throws ParseException
      * @throws CsvValidationException
+     * @throws InterruptedException
      */
-    public static void jiraJsonArray(Integer i, JSONArray json, FileWriter jiraWriter) throws IOException, ParseException, CsvValidationException{
+    public static void jiraJsonArray(Integer i, JSONArray json, FileWriter jiraWriter) throws IOException, ParseException, CsvValidationException, InterruptedException{
         String jsonKey = "fields";
-
+        Boolean isValid = true;
         JSONArray versionArray = json.getJSONObject(i%1000).getJSONObject(jsonKey).getJSONArray("versions");
         JSONArray fixVersionArray = json.getJSONObject(i%1000).getJSONObject(jsonKey).getJSONArray("fixVersions");
         String ovDate = json.getJSONObject(i%1000).getJSONObject(jsonKey).getString("created");
-        String[] version = new String[versionArray.length()];
-        String[] fixVersion = new String[fixVersionArray.length()];
+        Tuple oldestAffected = Pair.with(0, " ");
+        Tuple oldestFixed = Pair.with(0, " ");
         Integer k = 0;
-        Integer j = 0;
 
-        while(versionArray.length()!=0 && k<versionArray.length()){    
-            version[k] = versionArray.getJSONObject(k).getString("name");
-            k++;
+        String[] version = findAffected(versionArray);
+        String[] fixVersion = findFixed(fixVersionArray);
+
+        if(version.length != 0){
+            oldestAffected = minVersion(version);
+            //Controllo per verificare che ov<iv
+            isValid = validTicket(version[0], ovDate);
+
         }
 
-        Tuple oldestAffected = minVersion(version);
-
-        k=0;
-        while(fixVersionArray.length()!=0 && k<fixVersionArray.length()){    
-            String currFixVersion = fixVersionArray.getJSONObject(k).getString("name");
-            //Controllo sulle fixed versions per vedere se sono released
-            Boolean isReleasedVersion = searchCsvLine(0, currFixVersion, CSV_VERSIONS)!= null;
-            if(Boolean.TRUE.equals(isReleasedVersion)){
-                fixVersion[j] = currFixVersion;
-                j++;
-            }
-            k++;
+        if(fixVersion.length != 0){
+            oldestFixed = minVersion(fixVersion);
         }
 
-        Tuple oldestFixed = minVersion(version);
         //Controllo per vedere se è un post release bug
         Boolean isPostReleaseTicket = oldestAffected.getValue(1).equals(oldestFixed.getValue(1));
-        //Controllo per verificare che ov<iv
-        Boolean isValid = validTicket(version[0], ovDate);
+
         if(Boolean.FALSE.equals(isPostReleaseTicket) && Boolean.TRUE.equals(isValid)){
             String key = json.getJSONObject(i%1000).get("key").toString();
             String[] commit = searchCsvLine(2, key, CSV_COMMIT);
@@ -316,8 +376,9 @@ public class DataRetrieve
     * @return void
      * @throws ParseException
      * @throws CsvValidationException
+     * @throws InterruptedException
     */
-    public static void jiraData(FileWriter jiraWriter) throws JSONException, IOException, ParseException, CsvValidationException{
+    public static void jiraData(FileWriter jiraWriter) throws JSONException, IOException, ParseException, CsvValidationException, InterruptedException{
         Integer j = 0;
         Integer i = 0;
         Integer total = 1;
@@ -357,8 +418,6 @@ public class DataRetrieve
         String jiraId;
         Date lastRelease = getLastRelease();
         do{
-            System.out.println(i);
-
             String url = "https://api.github.com/repos/apache/"+PRJ_NAME+"/commits?page="+i.toString()+"&per_page=100";
             JSONArray jPage = new JSONArray(readJsonArrayFromUrl(url, true));
             l = jPage.length();
