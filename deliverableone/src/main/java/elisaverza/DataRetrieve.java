@@ -16,7 +16,10 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 
 import com.opencsv.CSVReader;
 import com.opencsv.exceptions.CsvValidationException;
@@ -34,9 +37,9 @@ public class DataRetrieve
     private static final String CSV_VERSIONS = "03-versionsdata.csv";
     private static final String PRJ_NAME = "SYNCOPE";
     private static final String USERNAME = "ElisaVerza";
-    private static final boolean DOWNLOAD_COMMIT = false;
+    private static final boolean DOWNLOAD_COMMIT = true;
     private static final boolean DOWNLOAD_JIRA = true;
-    private static final boolean DOWNLOAD_VERSIONS = false;
+    private static final boolean DOWNLOAD_VERSIONS = true;
     private static final String AUTH_CODE = "/home/ella/vsWorkspace/auth_code.txt";
     private static final String DATE_FORMAT = "yyyy-MM-dd";
 
@@ -47,10 +50,31 @@ public class DataRetrieve
             while ( (line = br.readLine()) != null ) {
                 String[] values = line.split(",");
                 last = new SimpleDateFormat(DATE_FORMAT).parse(values[1]);
-
             }
         }
         return last;
+    }
+
+    public static void sortVersions() throws IOException{
+        Integer i;
+        Map<String, String> versionMap = new HashMap<>();
+        try(BufferedReader br = new BufferedReader(new FileReader(CSV_VERSIONS))){
+            String line = br.readLine();
+            while ( (line = br.readLine()) != null ) {
+                String[] values = line.split(",");
+                versionMap.put(values[1], values[0]);
+            }
+        }
+        Map<String, String> sortedMap = new TreeMap<>(versionMap);
+        List<String> date = new ArrayList<>(sortedMap.keySet());
+        List<String> version = new ArrayList<>(sortedMap.values());
+        File versionsFile = new File(CSV_VERSIONS);
+        try(FileWriter versionsWriter = new FileWriter(versionsFile)){
+            versionsWriter.append("name, release date\n");
+            for(i=0; i<version.size();i++){
+                versionsWriter.append(version.get(i)+","+date.get(i)+"\n");
+            }
+        }
     }
 
     public static String getVersionByDate(String date) throws IOException, ParseException{
@@ -311,6 +335,20 @@ public class DataRetrieve
         return fixVersion;
     }
 
+    public static String[] affectedCalculated(Tuple affected, Tuple fixed) throws CsvValidationException, IOException{
+        List<List<String>> versions = csvToList(CSV_VERSIONS);
+        Integer startIndex = (Integer) affected.getValue(0);
+        Integer endIndex = (Integer) fixed.getValue(0);
+        Integer i;
+        String[] affectedArray = new String[0];
+        for(i=startIndex; i<endIndex; i++){
+            String[] newArray = new String[affectedArray.length + 1];
+            System.arraycopy(affectedArray, 0, newArray, 0, affectedArray.length);
+            affectedArray = newArray;
+            affectedArray[i-startIndex] = versions.get(i).get(0);
+        }
+        return affectedArray;
+    }
 
     /**
      * Metodo per ottenere i dati necessari dal jsonArray contenente il informazioni dei ticket 
@@ -355,12 +393,18 @@ public class DataRetrieve
         Boolean isPostReleaseTicket = oldestAffected.getValue(1).equals(oldestFixed.getValue(1));
 
         if(Boolean.FALSE.equals(isPostReleaseTicket) && Boolean.TRUE.equals(isValid)){
+            String affectedStr = " ";
+            if(oldestAffected.getValue(1)!= " " && oldestFixed.getValue(1)!= " "){
+                String[] affected = affectedCalculated(oldestAffected, oldestFixed);
+                affectedStr = Arrays.toString(affected).replace(",", " ");
+
+            }
             String key = json.getJSONObject(i%1000).get("key").toString();
             String[] commit = searchCsvLine(2, key, CSV_COMMIT);
             for(k=0;k<commit.length;k++){
                 if(commit[k] != null){
                     commit[k] = commit[k].replace("\n", " ");
-                    jiraWriter.append(commit[k]+","+oldestAffected.getValue(1)+","+oldestFixed.getValue(1)+","+ovDate+"\n");
+                    jiraWriter.append(commit[k]+","+affectedStr+","+oldestFixed.getValue(1)+"\n");
                 }
             }
         }
@@ -474,10 +518,12 @@ public class DataRetrieve
 
         if(DOWNLOAD_VERSIONS){
             File versionsFile = new File(CSV_VERSIONS);
-                try(FileWriter versionsWriter = new FileWriter(versionsFile)){
-                    versionsWriter.append("name, release date\n");
-                    versionsData(versionsWriter);    
-                }
+            try(FileWriter versionsWriter = new FileWriter(versionsFile)){
+                versionsWriter.append("name, release date\n");
+                versionsData(versionsWriter);
+            }
+            sortVersions();
+
         }
         if(DOWNLOAD_COMMIT){
             File commitFile = new File(CSV_COMMIT);
@@ -488,10 +534,10 @@ public class DataRetrieve
         }
         if(DOWNLOAD_JIRA){
         File jiraFile = new File(CSV_JIRA);
-            try(FileWriter jiraWriter = new FileWriter(jiraFile)){
-                jiraWriter.append("commit date git,commit sha,jira_id,affected versions,fixed version\n");
-                jiraData(jiraWriter);    
-            }
+        try(FileWriter jiraWriter = new FileWriter(jiraFile)){
+            jiraWriter.append("commit date git,commit sha,jira_id,affected versions,fixed version\n");
+            jiraData(jiraWriter);    
+        }
         }
     }
 

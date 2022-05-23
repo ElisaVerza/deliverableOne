@@ -7,8 +7,8 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 
@@ -23,6 +23,7 @@ import org.json.JSONObject;
 
 public class CsvCreator {
     public static final String PRJ_NAME = "SYNCOPE";
+    private static final String CSV_COMMIT = "01-commitdata.csv";
     private static final String CSV_JIRA = "02-ticketdata.csv";
     private static final String CSV_VERSIONS = "03-versionsdata.csv";
     private static final String CSV_METHRICS = "04-data.csv";
@@ -39,13 +40,13 @@ public class CsvCreator {
                 while((lineVd = brVd.readLine()) != null ) {
                     String[] valuesVd = lineVd.split(",");
 
-                    Date currentVersion = new SimpleDateFormat("yyyy-MM-dd").parse(valuesVd[1]);
-                    Date lastVersion = DataRetrieve.getLastRelease();
-                    if(lastVersion.compareTo(currentVersion) >= 0){
-                        String[] newArray = new String[commitSha.length + 1];
-                        System.arraycopy(commitSha, 0, newArray, 0, commitSha.length);
-                        commitSha = newArray;
-                        commitSha[i] = dateSearch(valuesVd[1]);
+                    String[] newArray = new String[commitSha.length + 1];
+                    System.arraycopy(commitSha, 0, newArray, 0, commitSha.length);
+                    commitSha = newArray;
+
+                    commitSha[i] = dateSearch(valuesVd[1]);
+                    if(!commitSha[i].equals(" ")){
+                        System.out.println(Arrays.toString(valuesVd)+" "+commitSha[i]);
                         String filesUrl = "https://api.github.com/repos/apache/"+PRJ_NAME+"/git/trees/"+commitSha[i]+"?recursive=1";
                         JSONObject filesJsonObj = DataRetrieve.readJsonObjFromUrl(filesUrl, true);
                         JSONArray jsonFiles = new JSONArray(filesJsonObj.getJSONArray("tree"));
@@ -106,7 +107,7 @@ public class CsvCreator {
     public static void bugginess() throws IOException, JSONException, ParseException, InterruptedException, CsvException{
         downloadFiles();
 
-        /*try(BufferedReader brTd = new BufferedReader(new FileReader(CSV_JIRA));
+        try(BufferedReader brTd = new BufferedReader(new FileReader(CSV_JIRA));
             BufferedReader brVd = new BufferedReader(new FileReader(CSV_VERSIONS));){
             String lineTd = brTd.readLine();
             String lineVd = brVd.readLine();
@@ -116,14 +117,13 @@ public class CsvCreator {
                 Integer j = 0;
 
                 while ( (lineTd = brTd.readLine()) != null ) {
-                    System.out.println("Version: "+version+"riga: "+j);
                     if(version!=null){
                         fileTouched(lineTd, j, version);
                     }
                     j++;
                 }
             }
-        }*/
+        }
     }
     
     /**
@@ -155,7 +155,7 @@ public class CsvCreator {
 
     public static String dateSearch(String dateStr) throws ParseException, IOException{
         Date releaseDate = new SimpleDateFormat("yyyy-MM-dd").parse(dateStr);
-        File file = new File(CSV_JIRA);
+        File file = new File(CSV_COMMIT);
         Integer i;
         String lastCommitSha = " ";
         try(BufferedReader br = new BufferedReader(new FileReader(file))){
@@ -163,9 +163,9 @@ public class CsvCreator {
             line = br.readLine();
             while ( (line = br.readLine()) != null ) {
                 String[] values = line.split(",");
-                Date commitDate = Date.from(Instant.parse(values[0]));
+                Date commitDate = new SimpleDateFormat("yyyy-MM-dd").parse(values[0].substring(0, 10));
                 i = releaseDate.compareTo(commitDate);
-                if(i>0){
+                if(i>=0){
                     lastCommitSha = values[1];
                     break;
                 }
