@@ -38,7 +38,7 @@ public class DataRetrieve
     private static final String PRJ_NAME = "SYNCOPE";
     private static final String USERNAME = "ElisaVerza";
     private static final boolean DOWNLOAD_COMMIT = false;
-    private static final boolean DOWNLOAD_JIRA = false;
+    private static final boolean DOWNLOAD_JIRA = true;
     private static final boolean DOWNLOAD_VERSIONS = false;
     private static final String AUTH_CODE = "/home/ella/vsWorkspace/auth_code.txt";
     private static final String DATE_FORMAT = "yyyy-MM-dd";
@@ -399,12 +399,13 @@ public class DataRetrieve
                 affectedStr = Arrays.toString(affected).replace(",", " ");
 
             }
+            String ov = getVersionByDate(ovDate);
             String key = json.getJSONObject(i%1000).get("key").toString();
             String[] commit = searchCsvLine(2, key, CSV_COMMIT);
             for(k=0;k<commit.length;k++){
                 if(commit[k] != null){
                     commit[k] = commit[k].replace("\n", " ");
-                    jiraWriter.append(commit[k]+","+affectedStr+","+oldestFixed.getValue(1)+"\n");
+                    jiraWriter.append(commit[k]+","+affectedStr+","+oldestFixed.getValue(1)+","+ov+"\n");
                 }
             }
         }

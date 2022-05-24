@@ -8,7 +8,6 @@ import java.io.IOException;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 
@@ -46,7 +45,6 @@ public class CsvCreator {
 
                     commitSha[i] = dateSearch(valuesVd[1]);
                     if(!commitSha[i].equals(" ")){
-                        System.out.println(Arrays.toString(valuesVd)+" "+commitSha[i]);
                         String filesUrl = "https://api.github.com/repos/apache/"+PRJ_NAME+"/git/trees/"+commitSha[i]+"?recursive=1";
                         JSONObject filesJsonObj = DataRetrieve.readJsonObjFromUrl(filesUrl, true);
                         JSONArray jsonFiles = new JSONArray(filesJsonObj.getJSONArray("tree"));
@@ -79,8 +77,6 @@ public class CsvCreator {
      */
     public static void fileTouched(String line, Integer rowIndex, String version) throws IOException, CsvException{
         Integer k;
-        System.out.println(version);
-
         String[] values = line.split(",");
         if(values.length > 3 && values[3].contains(version)) {
             String sha = values[1];
