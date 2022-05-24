@@ -37,9 +37,9 @@ public class DataRetrieve
     private static final String CSV_VERSIONS = "03-versionsdata.csv";
     private static final String PRJ_NAME = "SYNCOPE";
     private static final String USERNAME = "ElisaVerza";
-    private static final boolean DOWNLOAD_COMMIT = true;
-    private static final boolean DOWNLOAD_JIRA = true;
-    private static final boolean DOWNLOAD_VERSIONS = true;
+    private static final boolean DOWNLOAD_COMMIT = false;
+    private static final boolean DOWNLOAD_JIRA = false;
+    private static final boolean DOWNLOAD_VERSIONS = false;
     private static final String AUTH_CODE = "/home/ella/vsWorkspace/auth_code.txt";
     private static final String DATE_FORMAT = "yyyy-MM-dd";
 

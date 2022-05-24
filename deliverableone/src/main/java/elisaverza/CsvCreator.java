@@ -79,6 +79,7 @@ public class CsvCreator {
      */
     public static void fileTouched(String line, Integer rowIndex, String version) throws IOException, CsvException{
         Integer k;
+        System.out.println(version);
 
         String[] values = line.split(",");
         if(values.length > 3 && values[3].contains(version)) {
@@ -107,20 +108,20 @@ public class CsvCreator {
     public static void bugginess() throws IOException, JSONException, ParseException, InterruptedException, CsvException{
         downloadFiles();
 
-        try(BufferedReader brTd = new BufferedReader(new FileReader(CSV_JIRA));
-            BufferedReader brVd = new BufferedReader(new FileReader(CSV_VERSIONS));){
-            String lineTd = brTd.readLine();
+        try(BufferedReader brVd = new BufferedReader(new FileReader(CSV_VERSIONS));){
             String lineVd = brVd.readLine();
             while( (lineVd = brVd.readLine()) != null ){
                 String[] valuesVd = lineVd.split(",");
                 String version = valuesVd[0];
                 Integer j = 0;
-
-                while ( (lineTd = brTd.readLine()) != null ) {
-                    if(version!=null){
-                        fileTouched(lineTd, j, version);
+                try(BufferedReader brTd = new BufferedReader(new FileReader(CSV_JIRA))){
+                    String lineTd = brTd.readLine();
+                    while ( (lineTd = brTd.readLine()) != null ) {
+                        if(version!=null){
+                            fileTouched(lineTd, j, version);
+                        }
+                        j++;
                     }
-                    j++;
                 }
             }
         }
