@@ -2,6 +2,7 @@ package elisaverza;
 
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -22,6 +23,7 @@ import java.util.Map;
 import java.util.TreeMap;
 
 import com.opencsv.CSVReader;
+import com.opencsv.exceptions.CsvException;
 import com.opencsv.exceptions.CsvValidationException;
 
 import org.javatuples.Pair;
@@ -40,6 +42,7 @@ public class DataRetrieve
     private static final boolean DOWNLOAD_COMMIT = false;
     private static final boolean DOWNLOAD_JIRA = true;
     private static final boolean DOWNLOAD_VERSIONS = false;
+    private static final boolean INCREMENTAL = false;
     private static final String AUTH_CODE = "/home/ella/vsWorkspace/auth_code.txt";
     private static final String DATE_FORMAT = "yyyy-MM-dd";
 
@@ -369,6 +372,7 @@ public class DataRetrieve
         String jsonKey = "fields";
         Boolean isValid = true;
         JSONArray versionArray = json.getJSONObject(i%1000).getJSONObject(jsonKey).getJSONArray("versions");
+        String fixDate = json.getJSONObject(i%1000).getJSONObject(jsonKey).getString("resolutiondate");
         JSONArray fixVersionArray = json.getJSONObject(i%1000).getJSONObject(jsonKey).getJSONArray("fixVersions");
         String ovDate = json.getJSONObject(i%1000).getJSONObject(jsonKey).getString("created");
         Tuple oldestAffected = Pair.with(0, " ");
@@ -392,24 +396,42 @@ public class DataRetrieve
         //Controllo per vedere se è un post release bug
         Boolean isPostReleaseTicket = oldestAffected.getValue(1).equals(oldestFixed.getValue(1));
 
-        if(Boolean.FALSE.equals(isPostReleaseTicket) && Boolean.TRUE.equals(isValid)){
+        if(Boolean.FALSE.equals(isPostReleaseTicket) && Boolean.TRUE.equals(isValid) && oldestFixed.getValue(1)!= " "){
             String affectedStr = " ";
+            String ov = getVersionByDate(ovDate);
+
             if(oldestAffected.getValue(1)!= " " && oldestFixed.getValue(1)!= " "){
                 String[] affected = affectedCalculated(oldestAffected, oldestFixed);
                 affectedStr = Arrays.toString(affected).replace(",", " ");
-
             }
-            String ov = getVersionByDate(ovDate);
             String key = json.getJSONObject(i%1000).get("key").toString();
             String[] commit = searchCsvLine(2, key, CSV_COMMIT);
             for(k=0;k<commit.length;k++){
                 if(commit[k] != null){
                     commit[k] = commit[k].replace("\n", " ");
-                    jiraWriter.append(commit[k]+","+affectedStr+","+oldestFixed.getValue(1)+","+ov+"\n");
+                    jiraWriter.append(commit[k]+","+affectedStr+","+oldestFixed.getValue(1)+","+ov+","+ovDate+","+fixDate+"\n");
                 }
             }
         }
     }
+
+    public static void labeling() throws FileNotFoundException, IOException, CsvException{
+        Integer j = 1;
+        Float p = Proportion.pCalc();;
+        List<List<String>> csv = DataRetrieve.csvToList(CSV_JIRA);
+        for(j=1; j<csv.size(); j++) {  
+            String[] values = csv.get(j).get(3).split(" ");
+            //System.out.println(j);
+
+            if(values.length == 0 || values[0].equals(" ")){
+                //System.out.println(Arrays.toString(values));
+                System.out.println(j);
+                CsvCreator.updateDataCSV(CSV_JIRA,Proportion.ivCalc(csv.get(j).get(4),csv.get(j).get(5), p), j, 3);
+                // System.out.println(Proportion.ivCalc(values[4],values[5] ));
+            }
+        }
+    }
+    
 
     /** 
     * Metodo per ottenere dal jsonObject dei ticket jira il jsonArray "issue" cotenente i dati utili.
@@ -420,10 +442,10 @@ public class DataRetrieve
     * @param jiraWriter FileWriter del csv su cui verranno scritti i dati necessari dei ticket jira
     * @return void
      * @throws ParseException
-     * @throws CsvValidationException
      * @throws InterruptedException
+     * @throws CsvException
     */
-    public static void jiraData(FileWriter jiraWriter) throws JSONException, IOException, ParseException, CsvValidationException, InterruptedException{
+    public static void jiraData(FileWriter jiraWriter) throws JSONException, IOException, ParseException, InterruptedException, CsvException{
         Integer j = 0;
         Integer i = 0;
         Integer total = 1;
@@ -441,6 +463,7 @@ public class DataRetrieve
                 jiraJsonArray(i, json, jiraWriter);
             }  
       } while (i < total);
+      labeling();
     }
 
     /** 
@@ -513,9 +536,9 @@ public class DataRetrieve
     * @return void
      * @throws ParseException
      * @throws JSONException
-     * @throws CsvValidationException
+     * @throws CsvException
     */
-    public static void fileHandler() throws IOException, InterruptedException, ParseException, CsvValidationException, JSONException{
+    public static void fileHandler() throws IOException, InterruptedException, ParseException, JSONException, CsvException{
 
         if(DOWNLOAD_VERSIONS){
             File versionsFile = new File(CSV_VERSIONS);
@@ -543,7 +566,7 @@ public class DataRetrieve
     }
 
 
-    public static void main(String[] args) throws IOException, InterruptedException, ParseException, CsvValidationException, JSONException{
+    public static void main(String[] args) throws IOException, InterruptedException, ParseException, JSONException, CsvException{
         fileHandler();
     }
 }
