@@ -1,18 +1,17 @@
 package elisaverza;
-import java.io.BufferedReader;
-import java.io.FileReader;
 import java.io.IOException;
 import java.util.List;
 
 
 import com.opencsv.exceptions.CsvValidationException;
 
-import org.javatuples.Tuple;
 
 public class Proportion {
+    private Proportion() {
+        throw new IllegalStateException("Proportion class");
+    }
     private static final String CSV_JIRA = "02-ticketdata.csv";
     private static final String CSV_VERSIONS = "03-versionsdata.csv";
-    private static final boolean INCREMENTAL = false;
 
     public static Integer indexCalc(List<List<String>> versions, String verToFind){
         Integer i;
@@ -35,11 +34,11 @@ public class Proportion {
         String injected = " ";
 
         List<List<String>> csv = DataRetrieve.csvToList(CSV_JIRA);
+
         for(i = 1; i<csv.size(); i++) {
             String[] affected = csv.get(i).get(3).split(" ");
             if(affected.length != 0){
-                injected = affected[0].replace("[", "");
-                injected = injected.replace("]", "");
+                injected = affected[0];
             }
             List<List<String>> versions = DataRetrieve.csvToList(CSV_VERSIONS);
 
@@ -79,22 +78,12 @@ public class Proportion {
         String[] fvArray = {fixed};
         Integer ovIndex = (Integer) DataRetrieve.minVersion(ovArray).getValue(0);
         Integer fvIndex = (Integer) DataRetrieve.minVersion(fvArray).getValue(0);
-        //System.out.println("fixed: "+DataRetrieve.minVersion(fvArray).getValue(1)+" "+fvIndex);
-        //System.out.println("opening: "+DataRetrieve.minVersion(ovArray).getValue(1)+" "+ovIndex);
-        //System.out.println(p);
         Integer ivIndex = Math.round(fvIndex-(fvIndex-ovIndex)*p);
-        //System.out.println(ivIndex);
 
         if(ivIndex>csv.size()){
             ivIndex = csv.size()-1;
         }
-        //System.out.println("SONO QUI");
         return csv.get(ivIndex).get(0)+"mod";
     }
-
-    public static void main(String[] args) throws IOException, CsvValidationException{
-        //ivCalc();
-    }     
-
     
 }

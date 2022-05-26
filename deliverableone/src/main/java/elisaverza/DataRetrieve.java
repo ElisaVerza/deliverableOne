@@ -2,7 +2,6 @@ package elisaverza;
 
 import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -21,6 +20,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.logging.Logger;
 
 import com.opencsv.CSVReader;
 import com.opencsv.exceptions.CsvException;
@@ -34,15 +34,16 @@ import org.json.JSONObject;
 
 public class DataRetrieve 
 {
+    private static final Logger LOGGER = Logger.getLogger(DataRetrieve.class.getName());
+
     private static final String CSV_COMMIT = "01-commitdata.csv";
     private static final String CSV_JIRA = "02-ticketdata.csv";
     private static final String CSV_VERSIONS = "03-versionsdata.csv";
     private static final String PRJ_NAME = "SYNCOPE";
     private static final String USERNAME = "ElisaVerza";
     private static final boolean DOWNLOAD_COMMIT = false;
-    private static final boolean DOWNLOAD_JIRA = true;
+    private static final boolean DOWNLOAD_JIRA = false;
     private static final boolean DOWNLOAD_VERSIONS = false;
-    private static final boolean INCREMENTAL = false;
     private static final String AUTH_CODE = "/home/ella/vsWorkspace/auth_code.txt";
     private static final String DATE_FORMAT = "yyyy-MM-dd";
 
@@ -403,6 +404,8 @@ public class DataRetrieve
             if(oldestAffected.getValue(1)!= " " && oldestFixed.getValue(1)!= " "){
                 String[] affected = affectedCalculated(oldestAffected, oldestFixed);
                 affectedStr = Arrays.toString(affected).replace(",", " ");
+                affectedStr = affectedStr.replace("[", "");
+                affectedStr = affectedStr.replace("]", "");
             }
             String key = json.getJSONObject(i%1000).get("key").toString();
             String[] commit = searchCsvLine(2, key, CSV_COMMIT);
@@ -415,19 +418,17 @@ public class DataRetrieve
         }
     }
 
-    public static void labeling() throws FileNotFoundException, IOException, CsvException{
+    public static void labeling() throws IOException, CsvException{
+        LOGGER.warning("Labeling in corso...");
+
         Integer j = 1;
-        Float p = Proportion.pCalc();;
-        List<List<String>> csv = DataRetrieve.csvToList(CSV_JIRA);
-        for(j=1; j<csv.size(); j++) {  
-            String[] values = csv.get(j).get(3).split(" ");
-            //System.out.println(j);
+        List<List<String>> csvS = DataRetrieve.csvToList(CSV_JIRA);
+        Float p = Proportion.pCalc();
+        for(j=1; j<csvS.size(); j++) {  
+            String[] values = csvS.get(j).get(3).split(" ");
 
             if(values.length == 0 || values[0].equals(" ")){
-                //System.out.println(Arrays.toString(values));
-                System.out.println(j);
-                CsvCreator.updateDataCSV(CSV_JIRA,Proportion.ivCalc(csv.get(j).get(4),csv.get(j).get(5), p), j, 3);
-                // System.out.println(Proportion.ivCalc(values[4],values[5] ));
+                CsvCreator.updateDataCSV(CSV_JIRA,Proportion.ivCalc(csvS.get(j).get(4),csvS.get(j).get(5), p), j, 3);
             }
         }
     }
@@ -463,7 +464,6 @@ public class DataRetrieve
                 jiraJsonArray(i, json, jiraWriter);
             }  
       } while (i < total);
-      labeling();
     }
 
     /** 
@@ -539,8 +539,9 @@ public class DataRetrieve
      * @throws CsvException
     */
     public static void fileHandler() throws IOException, InterruptedException, ParseException, JSONException, CsvException{
-
         if(DOWNLOAD_VERSIONS){
+            LOGGER.warning("Download elenco versioni in corso...");
+
             File versionsFile = new File(CSV_VERSIONS);
             try(FileWriter versionsWriter = new FileWriter(versionsFile)){
                 versionsWriter.append("name, release date\n");
@@ -550,6 +551,8 @@ public class DataRetrieve
 
         }
         if(DOWNLOAD_COMMIT){
+            LOGGER.warning("Download informazioni commit in corso...");
+
             File commitFile = new File(CSV_COMMIT);
             try(FileWriter commitWriter = new FileWriter(commitFile)){
                 commitWriter.append("commit date,commit sha,jira_id\n");
@@ -557,12 +560,15 @@ public class DataRetrieve
             }
         }
         if(DOWNLOAD_JIRA){
-        File jiraFile = new File(CSV_JIRA);
-        try(FileWriter jiraWriter = new FileWriter(jiraFile)){
-            jiraWriter.append("commit date git,commit sha,jira_id,affected versions,fixed version\n");
-            jiraData(jiraWriter);    
+            LOGGER.warning("Download informazioni ticket in corso...");
+
+            File jiraFile = new File(CSV_JIRA);
+            try(FileWriter jiraWriter = new FileWriter(jiraFile)){
+                jiraWriter.append("commit date git,commit sha,jira_id,affected versions,fixed version\n");
+                jiraData(jiraWriter); 
+            }
         }
-        }
+        labeling();
     }
 
 
