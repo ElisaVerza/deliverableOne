@@ -1,0 +1,3 @@
+"1.0.0-incubatingmod"
+1.0.0-incubating
+Entro

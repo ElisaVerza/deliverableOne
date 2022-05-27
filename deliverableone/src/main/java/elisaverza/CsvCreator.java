@@ -30,6 +30,7 @@ public class CsvCreator {
     private static final String CSV_VERSIONS = "03-versionsdata.csv";
     private static final String CSV_METHRICS = "04-data.csv";
     private static final String CSV_CACHE = "05-commitcache.csv";
+    private static final boolean DOWNLOAD_DATA = true;
 
 
     public static void downloadFiles() throws IOException, ParseException{
@@ -42,6 +43,8 @@ public class CsvCreator {
             String lineVd = brVd.readLine();
             String [] commitSha = new String[0];
             try(FileWriter csvWriter = new FileWriter(CSV_METHRICS)){
+                csvWriter.append("versione,file,LOC Touched, metrica2, metrica3, metrica4, metrica5, metrica6, metrica7, metrica8, metrica9, bugginess\n");
+
                 while((lineVd = brVd.readLine()) != null ) {
                     String[] valuesVd = lineVd.split(",");
                     String[] newArray = new String[commitSha.length + 1];
@@ -58,7 +61,7 @@ public class CsvCreator {
 
                         for(k = 0; k<jsonFiles.length(); k++){
                             if(jsonFiles.getJSONObject(k).getString("path").contains(".java")){
-                                csvWriter.append(valuesVd[0]+","+jsonFiles.getJSONObject(k).getString("path")+","+"No\n");
+                                csvWriter.append(valuesVd[0]+","+jsonFiles.getJSONObject(k).getString("path")+","+0+","+0+","+0+","+0+","+0+","+0+","+0+","+0+","+0+","+"No\n");
                             }
                         }
                     }
@@ -83,30 +86,46 @@ public class CsvCreator {
      * @param version la versione di interesse da cercare nella colonna AV del csv ticketdata
      * @return void
      */
-    public static void fileTouched(String line, Integer rowIndex, String version) throws IOException, CsvException{
+    public static void fileTouched(String line, Integer rowIndex, String version, boolean overwrite) throws IOException, CsvException{
         LOGGER.warning("Ricerca file toccati dai commit in corso...");
-        LOGGER.warning(version);
-
+        LOGGER.warning(version);        
+        Integer i = 0;
         Integer k;
         String[] values = line.split(",");
+
         if(values.length > 3 && values[3].contains(version)) {
             String sha = values[1];
             String classesUrl = "https://api.github.com/repos/apache/"+PRJ_NAME+"/commits/"+sha.replace("\"", "");
             JSONObject classesJsonObj = DataRetrieve.readJsonObjFromUrl(classesUrl, true);
             JSONArray jsonClasses = new JSONArray(classesJsonObj.getJSONArray("files"));
-            String[] files = new String[jsonClasses.length()];
-            Integer[] added = new Integer[jsonClasses.length()];
-            Integer[] deleted = new Integer[jsonClasses.length()];
-            try(FileWriter csvWriter = new FileWriter(CSV_CACHE, true)){
+            String[] files = new String[0];
+            Integer[] added = new Integer[0];
+            Integer[] deleted = new Integer[0];
+            try(FileWriter csvWriter = new FileWriter(CSV_CACHE, overwrite)){
                 for(k=0; k<jsonClasses.length();k++){
                     if(jsonClasses.getJSONObject(k).getString("filename").contains(".java")){
-                        files[k] = jsonClasses.getJSONObject(k).getString("filename");
-                        added[k] = jsonClasses.getJSONObject(k).getInt("additions");
-                        deleted[k] = jsonClasses.getJSONObject(k).getInt("deletions");
-                        updateDataCSV(CSV_METHRICS, "Yes", rowIndex, 2);
+                        String[] newArrayFile = new String[files.length + 1];
+                        System.arraycopy(files, 0, newArrayFile, 0, files.length);
+                        files = newArrayFile;
+                        files[i] = jsonClasses.getJSONObject(k).getString("filename");
+
+                        Integer[] newArrayAdd = new Integer[added.length + 1];
+                        System.arraycopy(added, 0, newArrayAdd, 0, added.length);
+                        added = newArrayAdd;    
+                        added[i] = jsonClasses.getJSONObject(k).getInt("additions");
+
+                        Integer[] newArrayDel = new Integer[deleted.length + 1];
+                        System.arraycopy(deleted, 0, newArrayDel, 0, deleted.length);
+                        deleted = newArrayDel;    
+                        deleted[i] = jsonClasses.getJSONObject(k).getInt("deletions");
+
+                        updateDataCSV(CSV_METHRICS, "Yes", rowIndex, 11);
+                        i++;
                     }
                 }
-                csvWriter.append(sha+","+Arrays.toString(files)+","+Arrays.toString(added)+","+Arrays.toString(deleted)+"\n");
+                if(files.length!=0){
+                    csvWriter.append(version+","+sha+","+Arrays.toString(files).replace(",", " ")+","+Arrays.toString(added).replace(",", " ")+","+Arrays.toString(deleted).replace(",", " ")+"\n");
+                }
             }
         }
     }
@@ -119,21 +138,30 @@ public class CsvCreator {
      * come buggy tutti i file toccati dal commit risolutivo del ticket.
      * 
      * @return void
+     * @throws InterruptedException
      */
-    public static void bugginess() throws IOException, JSONException, ParseException, CsvException{
+    public static void bugginess() throws IOException, JSONException, ParseException, CsvException, InterruptedException{
         downloadFiles();
+        boolean overwrite = false;
 
         try(BufferedReader brVd = new BufferedReader(new FileReader(CSV_VERSIONS));){
             String lineVd = brVd.readLine();
             while( (lineVd = brVd.readLine()) != null ){
                 String[] valuesVd = lineVd.split(",");
                 String version = valuesVd[0];
-                Integer j = 0;
+                Integer j = 1;
                 try(BufferedReader brTd = new BufferedReader(new FileReader(CSV_JIRA))){
                     String lineTd = brTd.readLine();
                     while ( (lineTd = brTd.readLine()) != null ) {
                         if(version!=null){
-                            fileTouched(lineTd, j, version);
+
+                            if(!overwrite){
+                                fileTouched(lineTd, j, version, false);
+                            }
+                            else{
+                                fileTouched(lineTd, j, version, true);
+                            }
+                            overwrite = true;
                         }
                         j++;
                     }
@@ -194,6 +222,8 @@ public class CsvCreator {
     public static void main(String[] args) throws IOException, InterruptedException, JSONException, ParseException, CsvException{
         
         DataRetrieve.fileHandler();
-        bugginess();
+        if(DOWNLOAD_DATA){
+            bugginess();
+        }
     }
 }
