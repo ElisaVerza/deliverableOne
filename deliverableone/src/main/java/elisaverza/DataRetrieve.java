@@ -42,9 +42,9 @@ public class DataRetrieve
     private static final String PRJ_NAME = "SYNCOPE";
     private static final String USERNAME = "ElisaVerza";
     private static final boolean DOWNLOAD_COMMIT = false;
-    private static final boolean DOWNLOAD_JIRA = false;
+    private static final boolean DOWNLOAD_JIRA = true;
     private static final boolean DOWNLOAD_VERSIONS = false;
-    private static final String AUTH_CODE = "/home/ella/vsWorkspace/auth_code.txt";
+    private static final String AUTH_CODE = "auth_code.txt";
     private static final String DATE_FORMAT = "yyyy-MM-dd";
 
     public static Date getLastRelease() throws IOException, ParseException{
@@ -423,12 +423,36 @@ public class DataRetrieve
 
         Integer j = 1;
         List<List<String>> csvS = DataRetrieve.csvToList(CSV_JIRA);
+        List<List<String>> toCopy = new ArrayList<>(0);
         Float p = Proportion.pCalc();
         for(j=1; j<csvS.size(); j++) {  
-            String[] values = csvS.get(j).get(3).split(" ");
+            String values = csvS.get(j).get(3);
 
-            if(values.length == 0 || values[0].equals(" ")){
-                CsvCreator.updateDataCSV(CSV_JIRA,Proportion.ivCalc(csvS.get(j).get(4),csvS.get(j).get(5), p), j, 3);
+            if(values.length()==1){
+                String[] injVer = new String[] {Proportion.ivCalc(csvS.get(j).get(4),csvS.get(j).get(5), p)};
+                String[] fixVer = new String[] {csvS.get(j).get(4)};
+
+                if(!injVer[0].equals(fixVer[0])){
+                    Tuple ivTuple = minVersion(injVer);
+                    Tuple fvTuple = minVersion(fixVer);
+                    String affected = Arrays.toString(affectedCalculated(ivTuple, fvTuple)).replace("[", "");
+                    affected = affected.replace("]", "");
+                    affected = affected.replace("\"", "");
+                    affected = affected.replace(",", " ");
+                    csvS.get(j).set(3, affected);
+                    toCopy.add(csvS.get(j));
+                }
+            }
+            else{
+                toCopy.add(csvS.get(j));
+            }
+        }
+        File ticketFile = new File(CSV_JIRA);
+        try(FileWriter versionsWriter = new FileWriter(ticketFile)){
+            for(j=0; j<toCopy.size(); j++){
+                versionsWriter.append(toCopy.get(j).get(0)+","+toCopy.get(j).get(1)+","+toCopy.get(j).get(2)
+                +","+toCopy.get(j).get(3)+","+toCopy.get(j).get(4)+","+toCopy.get(j).get(5)+","
+                +toCopy.get(j).get(6)+","+toCopy.get(j).get(7)+"\n");
             }
         }
     }

@@ -83,7 +83,7 @@ public class Proportion {
         if(ivIndex>csv.size()){
             ivIndex = csv.size()-1;
         }
-        return csv.get(ivIndex).get(0)+"mod";
+        return csv.get(ivIndex).get(0);
     }
     
 }

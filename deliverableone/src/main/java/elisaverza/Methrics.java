@@ -12,7 +12,7 @@ public class Methrics {
     private static final String CSV_CACHE = "05-commitcache.csv";
 
 
-    public static void locTouched() throws IOException, ParseException, CsvException{
+    public static void locTouched() throws IOException, ParseException, CsvException, InterruptedException{
         Integer i;
         Integer j;
         Integer k;
@@ -23,7 +23,10 @@ public class Methrics {
         for(i=0; i<commit.size(); i++){
             System.out.println(i);
             for(j=0; j<methrics.size(); j++){
-                if(commit.get(i).get(0).contains(methrics.get(j).get(0))){
+                if(commit.get(i).get(0).equals(methrics.get(j).get(0))){
+                    System.out.println(commit.get(i).get(0)+" ENTRO "+methrics.get(j).get(0));
+                    Thread.sleep(1000);
+                    
                     String filesList = commit.get(i).get(2).replace("[", "");
                     filesList = filesList.replace("]", "");
                     String[] files = filesList.split(" ");
@@ -44,15 +47,12 @@ public class Methrics {
 
                         }
                     }
-
-                    //
-                    //String
                 }
             }
         }
     }
 
-    public static void main(String[] args) throws IOException, ParseException, CsvException{
+    public static void main(String[] args) throws IOException, ParseException, CsvException, InterruptedException{
         locTouched();
     }
 

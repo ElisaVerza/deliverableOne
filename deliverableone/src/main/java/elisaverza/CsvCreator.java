@@ -38,7 +38,7 @@ public class CsvCreator {
 
         Integer k;
         Integer i = 0;
-
+        System.out.println("Ciao");
         try(BufferedReader brVd = new BufferedReader(new FileReader(CSV_VERSIONS))){
             String lineVd = brVd.readLine();
             String [] commitSha = new String[0];
@@ -86,46 +86,38 @@ public class CsvCreator {
      * @param version la versione di interesse da cercare nella colonna AV del csv ticketdata
      * @return void
      */
-    public static void fileTouched(String line, Integer rowIndex, String version, boolean overwrite) throws IOException, CsvException{
-        LOGGER.warning("Ricerca file toccati dai commit in corso...");
-        LOGGER.warning(version);        
-        Integer i = 0;
+    public static void fileTouched(String line, Integer rowIndex, String version,  FileWriter csvWriter) throws IOException, CsvException{
+        //LOGGER.warning("Ricerca file toccati dai commit in corso...");
+        //LOGGER.warning(version);        
         Integer k;
+        Integer z;
         String[] values = line.split(",");
+        String valuesPure = values[3].replace("[", "");
+        valuesPure = valuesPure.replace("]", "");
+        valuesPure = valuesPure.replace("\"", "");
+        String[] ticketAffectedVer =  valuesPure.split(" ");
 
-        if(values.length > 3 && values[3].contains(version)) {
-            String sha = values[1];
-            String classesUrl = "https://api.github.com/repos/apache/"+PRJ_NAME+"/commits/"+sha.replace("\"", "");
-            JSONObject classesJsonObj = DataRetrieve.readJsonObjFromUrl(classesUrl, true);
-            JSONArray jsonClasses = new JSONArray(classesJsonObj.getJSONArray("files"));
-            String[] files = new String[0];
-            Integer[] added = new Integer[0];
-            Integer[] deleted = new Integer[0];
-            try(FileWriter csvWriter = new FileWriter(CSV_CACHE, overwrite)){
+        for(z=0; z<ticketAffectedVer.length; z++){
+            if(values.length > 3 && ticketAffectedVer[z].equals(version)) {
+                String sha = values[1];
+                String classesUrl = "https://api.github.com/repos/apache/"+PRJ_NAME+"/commits/"+sha.replace("\"", "");
+                JSONObject classesJsonObj = DataRetrieve.readJsonObjFromUrl(classesUrl, true);
+                JSONArray jsonClasses = new JSONArray(classesJsonObj.getJSONArray("files"));
+                List<String> files = new ArrayList<>();
+                List<Integer> added = new ArrayList<>();
+                List<Integer> deleted = new ArrayList<>();
                 for(k=0; k<jsonClasses.length();k++){
                     if(jsonClasses.getJSONObject(k).getString("filename").contains(".java")){
-                        String[] newArrayFile = new String[files.length + 1];
-                        System.arraycopy(files, 0, newArrayFile, 0, files.length);
-                        files = newArrayFile;
-                        files[i] = jsonClasses.getJSONObject(k).getString("filename");
-
-                        Integer[] newArrayAdd = new Integer[added.length + 1];
-                        System.arraycopy(added, 0, newArrayAdd, 0, added.length);
-                        added = newArrayAdd;    
-                        added[i] = jsonClasses.getJSONObject(k).getInt("additions");
-
-                        Integer[] newArrayDel = new Integer[deleted.length + 1];
-                        System.arraycopy(deleted, 0, newArrayDel, 0, deleted.length);
-                        deleted = newArrayDel;    
-                        deleted[i] = jsonClasses.getJSONObject(k).getInt("deletions");
+                        files.add(jsonClasses.getJSONObject(k).getString("filename"));
+                        added.add(jsonClasses.getJSONObject(k).getInt("additions"));
+                        deleted.add(jsonClasses.getJSONObject(k).getInt("deletions"));
 
                         updateDataCSV(CSV_METHRICS, "Yes", rowIndex, 11);
-                        i++;
                     }
                 }
-                if(files.length!=0){
-                    csvWriter.append(version+","+sha+","+Arrays.toString(files).replace(",", " ")+","+Arrays.toString(added).replace(",", " ")+","+Arrays.toString(deleted).replace(",", " ")+"\n");
-                }
+                if(files.size()!=0){
+                    csvWriter.append(version+","+sha+","+files+","+added+","+deleted+"\n");
+                } 
             }
         }
     }
@@ -142,9 +134,10 @@ public class CsvCreator {
      */
     public static void bugginess() throws IOException, JSONException, ParseException, CsvException, InterruptedException{
         downloadFiles();
-        boolean overwrite = false;
 
-        try(BufferedReader brVd = new BufferedReader(new FileReader(CSV_VERSIONS));){
+        try(BufferedReader brVd = new BufferedReader(new FileReader(CSV_VERSIONS));
+            FileWriter csvWriter = new FileWriter(CSV_CACHE)){
+            
             String lineVd = brVd.readLine();
             while( (lineVd = brVd.readLine()) != null ){
                 String[] valuesVd = lineVd.split(",");
@@ -154,17 +147,11 @@ public class CsvCreator {
                     String lineTd = brTd.readLine();
                     while ( (lineTd = brTd.readLine()) != null ) {
                         if(version!=null){
-
-                            if(!overwrite){
-                                fileTouched(lineTd, j, version, false);
-                            }
-                            else{
-                                fileTouched(lineTd, j, version, true);
-                            }
-                            overwrite = true;
+                            fileTouched(lineTd, j, version, csvWriter);
                         }
                         j++;
                     }
+
                 }
             }
         }
@@ -220,10 +207,10 @@ public class CsvCreator {
 
 
     public static void main(String[] args) throws IOException, InterruptedException, JSONException, ParseException, CsvException{
-        
         DataRetrieve.fileHandler();
         if(DOWNLOAD_DATA){
             bugginess();
+            //Methrics.locTouched();
         }
     }
 }
